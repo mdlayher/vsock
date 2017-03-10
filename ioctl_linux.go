@@ -26,22 +26,19 @@ type fs interface {
 }
 
 // localContextID retrieves the local context ID for this system, using the
-// methods from fs.
-func localContextID(fs fs) (uint32, error) {
+// methods from fs.  The context ID is stored in cid for later use.
+//
+// This method uses this signature to enable easier testing without unsafe
+// usage of unsafe.Pointer.
+func localContextID(fs fs, cid *uint32) error {
 	f, err := fs.Open(devVsock)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer f.Close()
 
 	// Retrieve the context ID of this machine from /dev/vsock.
-	var cid uint32
-	err = fs.Ioctl(f.Fd(), ioctlGetLocalCID, uintptr(unsafe.Pointer(&cid)))
-	if err != nil {
-		return 0, err
-	}
-
-	return cid, nil
+	return fs.Ioctl(f.Fd(), ioctlGetLocalCID, uintptr(unsafe.Pointer(cid)))
 }
 
 // A sysFS is the system call implementation of fs.
