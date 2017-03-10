@@ -14,11 +14,17 @@ func Test_localContextIDGuest(t *testing.T) {
 	)
 
 	// Since it isn't safe to manipulate the argument pointer with
-	// ioctl, we just check that the ioctl performs its commands
-	// on the appropriate file descriptor and request number.
+	// ioctl, we check that the ioctl performs its commands
+	// on the appropriate file descriptor and request number, and
+	// then use a map to emulate the ioctl setting the context ID
+	// into a *uint32.
 	//
-	// TODO(mdlayher): An option would be to pass a *uint32
-	// to localContextID to enable testing this with a map[uintptr]*uint32.
+	// Thanks to @zeebo from Gophers Slack for this idea.
+	var cid uint32
+	cfds := map[uintptr]*uint32{
+		fd: &cid,
+	}
+
 	ioctl := func(ioctlFD uintptr, request int, _ uintptr) error {
 		if want, got := fd, ioctlFD; want != got {
 			t.Fatalf("unexpected file descriptor for ioctl:\n- want: %d\n-  got: %d",
@@ -30,17 +36,29 @@ func Test_localContextIDGuest(t *testing.T) {
 				want, got)
 		}
 
+		cidp, ok := cfds[ioctlFD]
+		if !ok {
+			t.Fatal("ioctl file descriptor not found in map")
+		}
+
+		*cidp = contextID
 		return nil
 	}
 
-	_, err := localContextID(&testFS{
+	fs := &testFS{
 		open: func(name string) (*os.File, error) {
 			return os.NewFile(fd, name), nil
 		},
 		ioctl: ioctl,
-	})
-	if err != nil {
+	}
+
+	if err := localContextID(fs, &cid); err != nil {
 		t.Fatalf("failed to retrieve host's context ID: %v", err)
+	}
+
+	if want, got := contextID, cid; want != got {
+		t.Fatalf("unexpected context ID:\n- want: %d\n-  got: %d",
+			want, got)
 	}
 }
 
@@ -49,8 +67,8 @@ func Test_localContextIDGuestIntegration(t *testing.T) {
 		t.Skip("machine is not a guest, skipping")
 	}
 
-	cid, err := localContextID(sysFS{})
-	if err != nil {
+	var cid uint32
+	if err := localContextID(sysFS{}, &cid); err != nil {
 		t.Fatalf("failed to retrieve guest's context ID: %v", err)
 	}
 
@@ -66,8 +84,8 @@ func Test_localContextIDHostIntegration(t *testing.T) {
 		t.Skip("machine is not a hypervisor, skipping")
 	}
 
-	cid, err := localContextID(sysFS{})
-	if err != nil {
+	var cid uint32
+	if err := localContextID(sysFS{}, &cid); err != nil {
 		t.Fatalf("failed to retrieve host's context ID: %v", err)
 	}
 
@@ -85,8 +103,8 @@ func isHypervisor(t *testing.T) bool {
 		t.Skipf("device %q not available, kernel module not loaded?", devVsock)
 	}
 
-	cid, err := localContextID(sysFS{})
-	if err != nil {
+	var cid uint32
+	if err := localContextID(sysFS{}, &cid); err != nil {
 		if os.IsPermission(err) {
 			t.Skipf("permission denied, make sure user has access to %q", devVsock)
 		}
