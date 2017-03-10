@@ -14,7 +14,8 @@ const (
 	// how to make it portable across architectures.
 	ioctlGetLocalCID = 0x7b9
 
-	// devVsock is the location of /dev/vsock.
+	// devVsock is the location of /dev/vsock.  It is exposed on both the
+	// hypervisor and on virtual machines.
 	devVsock = "/dev/vsock"
 )
 
@@ -29,17 +30,6 @@ type fs interface {
 func localContextID(fs fs) (uint32, error) {
 	f, err := fs.Open(devVsock)
 	if err != nil {
-		// If /dev/vsock doesn't exist, assume this is the hypervisor.
-		// Unfortunately, this also means that machines that don't support
-		// VM sockets will hit this case.
-		//
-		// TODO(mdlayher): attempt to differentiate VM sockets being unsupported
-		// and /dev/vsock just not being available on a hypervisor that does support
-		// them.
-		if os.IsNotExist(err) {
-			return ContextIDHost, nil
-		}
-
 		return 0, err
 	}
 	defer f.Close()

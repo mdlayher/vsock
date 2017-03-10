@@ -45,8 +45,8 @@ func Test_localContextIDGuest(t *testing.T) {
 }
 
 func Test_localContextIDGuestIntegration(t *testing.T) {
-	if !devVsockExists(t) {
-		t.Skipf("machine does not have %q, skipping guest integration test", devVsock)
+	if isHypervisor(t) {
+		t.Skip("machine is not a guest, skipping")
 	}
 
 	cid, err := localContextID(sysFS{})
@@ -61,29 +61,9 @@ func Test_localContextIDGuestIntegration(t *testing.T) {
 	}
 }
 
-func Test_localContextIDHost(t *testing.T) {
-	cid, err := localContextID(&testFS{
-		// Pretend that device doesn't exist, like on a hypervisor
-		//
-		// TODO(mdlayher): also differentiate between a hypervisor versus a machine
-		// without the kernel modules installed.
-		open: func(_ string) (*os.File, error) {
-			return nil, os.ErrNotExist
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to retrieve host's context ID: %v", err)
-	}
-
-	if want, got := ContextIDHost, cid; want != got {
-		t.Fatalf("unexpected host context ID:\n- want: %d\n-  got: %d",
-			want, got)
-	}
-}
-
 func Test_localContextIDHostIntegration(t *testing.T) {
-	if devVsockExists(t) {
-		t.Skipf("machine has %q, skipping host integration test", devVsock)
+	if !isHypervisor(t) {
+		t.Skip("machine is not a hypervisor, skipping")
 	}
 
 	cid, err := localContextID(sysFS{})
@@ -97,13 +77,40 @@ func Test_localContextIDHostIntegration(t *testing.T) {
 	}
 }
 
-func devVsockExists(t *testing.T) bool {
-	_, err := os.Stat(devVsock)
+// isHypervisor attempt to detect if this machine is a hypervisor by
+// determining if /dev/vsock is available, and then if its context ID
+// matches the one assigned to hosts.
+func isHypervisor(t *testing.T) bool {
+	if !exists(t, devVsock) {
+		t.Skipf("device %q not available, kernel module not loaded?", devVsock)
+	}
+
+	cid, err := localContextID(sysFS{})
+	if err != nil {
+		if os.IsPermission(err) {
+			t.Skipf("permission denied, make sure user has access to %q", devVsock)
+		}
+
+		t.Fatalf("failed to retrieve context ID: %v", err)
+	}
+
+	switch cid {
+	case ContextIDHost:
+		return true
+	case ContextIDHypervisor, ContextIDReserved:
+		t.Fatalf("context ID %d is reserved, failing", cid)
+	}
+
+	return false
+}
+
+func exists(t *testing.T, device string) bool {
+	_, err := os.Stat(device)
 	switch {
 	case os.IsNotExist(err):
 		return false
 	case err != nil:
-		t.Fatalf("failed to check for %q: %v", devVsock, err)
+		t.Fatalf("failed to check for %q: %v", device, err)
 	}
 
 	return true
