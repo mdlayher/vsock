@@ -3,8 +3,9 @@ package vsock
 import (
 	"fmt"
 	"os"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -46,8 +47,8 @@ type sysFS struct{}
 
 func (sysFS) Open(name string) (*os.File, error) { return os.Open(name) }
 func (sysFS) Ioctl(fd uintptr, request int, argp uintptr) error {
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
 		fd,
 		uintptr(request),
 		argp,
