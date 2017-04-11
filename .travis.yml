@@ -6,7 +6,7 @@ os:
 sudo: required
 before_install:
   - go get github.com/golang/lint/golint
-  - go get honnef.co/go/staticcheck/cmd/staticcheck
+  - go get honnef.co/go/tools/cmd/staticcheck
   - go get -d ./...
   - sudo modprobe vmw_vsock_vmci_transport
   - sudo chmod 666 /dev/vsock
