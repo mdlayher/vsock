@@ -12,6 +12,19 @@ To make use of VM sockets with QEMU and virtio-vsock, you must have:
   - a Linux virtual machine on that hypervisor with kernel 4.8+
   - QEMU 2.8+ on the hypervisor, running the virtual machine
 
+Before using VM sockets, following modules must be removed on hypervisor:
+  - `modprobe -r vmw_vsock_vmci_transport`
+  - `modprobe -r vmw_vsock_virtio_transport_common`
+  - `modprobe -r vsock`
+  
+Once removed, `vhost_vsock` module needs to be enabled on hypervisor:
+  - `modprobe vhost_vsock`
+
+On VM, you have to enable `vmw_vsock_vmci_transport` module.
+
+To utilize VM sockets, VM needs to be powered on with following `-device` flag: 
+  - `-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3`
+
 Check out the
 [QEMU wiki page on virtio-vsock](http://wiki.qemu-project.org/Features/VirtioVsock)
 for more details.  More detail on setting up this environment will be provided
