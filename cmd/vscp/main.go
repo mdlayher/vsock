@@ -82,7 +82,7 @@ func receive(target string, port uint32) {
 
 	logf("opening listener: %d", port)
 
-	l, err := vsock.ListenStream(port)
+	l, err := vsock.Listen(port)
 	if err != nil {
 		fatalf("failed to listen: %v", err)
 	}
@@ -141,7 +141,7 @@ func send(target string, cid, port uint32) {
 	logf("dialing: %d.%d", cid, port)
 
 	// Dial a remote server and send a stream to that server.
-	c, err := vsock.DialStream(cid, port)
+	c, err := vsock.Dial(cid, port)
 	if err != nil {
 		fatalf("failed to dial: %v", err)
 	}

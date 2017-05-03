@@ -21,7 +21,7 @@ const (
 	ContextIDHost uint32 = 0x2
 )
 
-// ListenStream opens a connection-oriented net.Listener for incoming VM sockets
+// Listen opens a connection-oriented net.Listener for incoming VM sockets
 // connections.  The port parameter specifies the port for the listener.
 //
 // To allow the server to assign a port automatically, specify 0 for port.
@@ -30,11 +30,11 @@ const (
 // The Accept method is used to accept incoming connections.
 //
 // When the listener is no longer needed, Close must be called to free resources.
-func ListenStream(port uint32) (net.Listener, error) {
+func Listen(port uint32) (net.Listener, error) {
 	return listenStream(port)
 }
 
-// DialStream dials a connection-oriented net.Conn to a VM sockets server.
+// Dial dials a connection-oriented net.Conn to a VM sockets server.
 // The contextID and port parameters specify the address of the server.
 //
 // If dialing a connection from the hypervisor to a virtual machine, the VM's
@@ -45,11 +45,11 @@ func ListenStream(port uint32) (net.Listener, error) {
 // to other processes on the host machine.
 //
 // When the connection is no longer needed, Close must be called to free resources.
-func DialStream(contextID, port uint32) (net.Conn, error) {
+func Dial(contextID, port uint32) (net.Conn, error) {
 	return dialStream(contextID, port)
 }
 
-// TODO(mdlayher): ListenDatagram and DialDatagram.
+// TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 
 var _ net.Addr = &Addr{}
 
