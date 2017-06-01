@@ -4,6 +4,9 @@ vsock [![Build Status](https://travis-ci.org/mdlayher/vsock.svg?branch=master)](
 Package `vsock` provides access to Linux VM sockets (`AF_VSOCK`) for
 communication between a hypervisor and its virtual machines.  MIT Licensed.
 
+For more information about VM sockets, check out my blog about
+[Linux VM sockets in Go](https://medium.com/@mdlayher/linux-vm-sockets-in-go-ea11768e9e67).
+
 Requirements
 ------------
 
@@ -16,13 +19,13 @@ Before using VM sockets, following modules must be removed on hypervisor:
   - `modprobe -r vmw_vsock_vmci_transport`
   - `modprobe -r vmw_vsock_virtio_transport_common`
   - `modprobe -r vsock`
-  
+
 Once removed, `vhost_vsock` module needs to be enabled on hypervisor:
   - `modprobe vhost_vsock`
 
 On VM, you have to enable `vmw_vsock_vmci_transport` module.
 
-To utilize VM sockets, VM needs to be powered on with following `-device` flag: 
+To utilize VM sockets, VM needs to be powered on with following `-device` flag:
   - `-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3`
 
 Check out the
