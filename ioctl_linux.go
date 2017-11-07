@@ -9,12 +9,6 @@ import (
 )
 
 const (
-	// ioctlGetLocalCID is an ioctl value that retrieves the local context ID
-	// from /dev/vsock.
-	// TODO(mdlayher): this is probably linux/amd64 specific, but I'm unsure
-	// how to make it portable across architectures.
-	ioctlGetLocalCID = 0x7b9
-
 	// devVsock is the location of /dev/vsock.  It is exposed on both the
 	// hypervisor and on virtual machines.
 	devVsock = "/dev/vsock"
@@ -39,7 +33,7 @@ func localContextID(fs fs, cid *uint32) error {
 	defer f.Close()
 
 	// Retrieve the context ID of this machine from /dev/vsock.
-	return fs.Ioctl(f.Fd(), ioctlGetLocalCID, uintptr(unsafe.Pointer(cid)))
+	return fs.Ioctl(f.Fd(), unix.IOCTL_VM_SOCKETS_GET_LOCAL_CID, uintptr(unsafe.Pointer(cid)))
 }
 
 // A sysFS is the system call implementation of fs.
