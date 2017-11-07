@@ -5,6 +5,8 @@ package vsock
 import (
 	"os"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func Test_localContextIDGuest(t *testing.T) {
@@ -31,7 +33,7 @@ func Test_localContextIDGuest(t *testing.T) {
 				want, got)
 		}
 
-		if want, got := ioctlGetLocalCID, request; want != got {
+		if want, got := unix.IOCTL_VM_SOCKETS_GET_LOCAL_CID, request; want != got {
 			t.Fatalf("unexpected request number for ioctl:\n- want: %x\n-  got: %x",
 				want, got)
 		}
