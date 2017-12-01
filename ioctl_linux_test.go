@@ -5,6 +5,7 @@ package vsock
 import (
 	"os"
 	"testing"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -27,7 +28,7 @@ func Test_localContextIDGuest(t *testing.T) {
 		fd: &cid,
 	}
 
-	ioctl := func(ioctlFD uintptr, request int, _ uintptr) error {
+	ioctl := func(ioctlFD uintptr, request int, _ unsafe.Pointer) error {
 		if want, got := fd, ioctlFD; want != got {
 			t.Fatalf("unexpected file descriptor for ioctl:\n- want: %d\n-  got: %d",
 				want, got)
@@ -141,13 +142,13 @@ var _ fs = &testFS{}
 // A testFS is the testing implementation of fs.
 type testFS struct {
 	open  func(name string) (*os.File, error)
-	ioctl func(fd uintptr, request int, argp uintptr) error
+	ioctl func(fd uintptr, request int, argp unsafe.Pointer) error
 }
 
 func (fs *testFS) Open(name string) (*os.File, error) {
 	return fs.open(name)
 }
 
-func (fs *testFS) Ioctl(fd uintptr, request int, argp uintptr) error {
+func (fs *testFS) Ioctl(fd uintptr, request int, argp unsafe.Pointer) error {
 	return fs.ioctl(fd, request, argp)
 }
