@@ -4,6 +4,8 @@ vsock [![Build Status](https://travis-ci.org/mdlayher/vsock.svg?branch=master)](
 Package `vsock` provides access to Linux VM sockets (`AF_VSOCK`) for
 communication between a hypervisor and its virtual machines.  MIT Licensed.
 
+Go 1.11+ is required to use package `vsock`.
+
 For more information about VM sockets, check out my blog about
 [Linux VM sockets in Go](https://medium.com/@mdlayher/linux-vm-sockets-in-go-ea11768e9e67).
 

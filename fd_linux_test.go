@@ -20,12 +20,14 @@ type testFD struct {
 	listen      func(n int) error
 	newFile     func(name string) *os.File
 	getsockname func() (unix.Sockaddr, error)
+	setNonblock func(nonblocking bool) error
 }
 
 func (fd *testFD) Accept4(flags int) (fd, unix.Sockaddr, error) { return fd.accept4(flags) }
 func (fd *testFD) Bind(sa unix.Sockaddr) error                  { return fd.bind(sa) }
 func (fd *testFD) Close() error                                 { return fd.close() }
 func (fd *testFD) Connect(sa unix.Sockaddr) error               { return fd.connect(sa) }
+func (fd *testFD) Getsockname() (unix.Sockaddr, error)          { return fd.getsockname() }
 func (fd *testFD) Listen(n int) error                           { return fd.listen(n) }
 func (fd *testFD) NewFile(name string) *os.File                 { return fd.newFile(name) }
-func (fd *testFD) Getsockname() (unix.Sockaddr, error)          { return fd.getsockname() }
+func (fd *testFD) SetNonblock(nonblocking bool) error           { return fd.setNonblock(nonblocking) }
