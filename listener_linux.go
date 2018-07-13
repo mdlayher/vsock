@@ -36,7 +36,7 @@ func (l *listener) Accept() (net.Conn, error) {
 	}
 
 	return &conn{
-		File:       cfd.NewFile(l.addr.fileName()),
+		file:       cfd.NewFile(l.addr.fileName()),
 		localAddr:  l.addr,
 		remoteAddr: remoteAddr,
 	}, nil
