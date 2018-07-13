@@ -181,7 +181,7 @@ func Test_listenerAccept(t *testing.T) {
 			want, got)
 	}
 
-	if want, got := connFD, c.File.Fd(); want != got {
+	if want, got := connFD, c.file.Fd(); want != got {
 		t.Fatalf("unexpected conn file descriptor:\n- want: %d\n-  got: %d",
 			want, got)
 	}

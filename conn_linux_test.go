@@ -101,7 +101,7 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 			want, got)
 	}
 
-	if want, got := localFD, c.File.Fd(); want != got {
+	if want, got := localFD, c.file.Fd(); want != got {
 		t.Fatalf("unexpected conn file descriptor:\n- want: %d\n-  got: %d",
 			want, got)
 	}

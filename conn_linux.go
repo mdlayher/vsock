@@ -23,7 +23,7 @@ var _ net.Conn = &conn{}
 
 // A conn is the net.Conn implementation for VM sockets.
 type conn struct {
-	*os.File
+	file       *os.File
 	localAddr  *Addr
 	remoteAddr *Addr
 }
@@ -36,6 +36,11 @@ func (c *conn) RemoteAddr() net.Addr { return c.remoteAddr }
 func (c *conn) SetDeadline(_ time.Time) error      { return errDeadlinesNotImplemented }
 func (c *conn) SetReadDeadline(_ time.Time) error  { return errDeadlinesNotImplemented }
 func (c *conn) SetWriteDeadline(_ time.Time) error { return errDeadlinesNotImplemented }
+
+// Read, Write and Close implement the net.Conn interface for conn.
+func (c *conn) Read(b []byte) (n int, err error)  { return c.file.Read(b) }
+func (c *conn) Write(b []byte) (n int, err error) { return c.file.Write(b) }
+func (c *conn) Close() error                      { return c.file.Close() }
 
 // dialStream is the entry point for DialStream on Linux.
 func dialStream(cid, port uint32) (net.Conn, error) {
@@ -90,7 +95,7 @@ func dialStreamLinux(cfd fd, cid, port uint32) (net.Conn, error) {
 	}
 
 	return &conn{
-		File:       cfd.NewFile(remoteAddr.fileName()),
+		file:       cfd.NewFile(remoteAddr.fileName()),
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}, nil
