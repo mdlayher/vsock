@@ -55,22 +55,28 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		Port: remotePort,
 	}
 
-	connectFn := func(sa unix.Sockaddr) error {
-		if want, got := rsa, sa; !reflect.DeepEqual(want, got) {
-			t.Fatalf("unexpected connect sockaddr:\n- want: %#v\n-  got: %#v",
-				want, got)
-		}
-
-		return nil
-	}
-
 	lfd := &testFD{
-		connect: connectFn,
+		connect: func(sa unix.Sockaddr) error {
+			if want, got := rsa, sa; !reflect.DeepEqual(want, got) {
+				t.Fatalf("unexpected connect sockaddr:\n- want: %#v\n-  got: %#v",
+					want, got)
+			}
+
+			return nil
+		},
 		getsockname: func() (unix.Sockaddr, error) {
 			return lsa, nil
 		},
 		newFile: func(name string) *os.File {
 			return os.NewFile(localFD, name)
+		},
+		setNonblock: func(nonblocking bool) error {
+			if want, got := true, nonblocking; !reflect.DeepEqual(want, got) {
+				t.Fatalf("unexpected set nonblocking value:\n- want: %#v\n-  got: %#v",
+					want, got)
+			}
+
+			return nil
 		},
 	}
 

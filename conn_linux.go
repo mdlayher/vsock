@@ -3,20 +3,11 @@
 package vsock
 
 import (
-	"errors"
 	"net"
 	"os"
 	"time"
 
 	"golang.org/x/sys/unix"
-)
-
-var (
-	// errDeadlinesNotImplemented is returned by the SetDeadline family of methods
-	// for conn, because access is not yet available to the runtime network poller
-	// for non-standard sockets types.
-	// See: https://github.com/golang/go/issues/10565.
-	errDeadlinesNotImplemented = errors.New("vsock: deadlines not implemented")
 )
 
 var _ net.Conn = &conn{}
@@ -28,19 +19,15 @@ type conn struct {
 	remoteAddr *Addr
 }
 
-// LocalAddr and RemoteAddr implement the net.Conn interface for conn.
-func (c *conn) LocalAddr() net.Addr  { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr { return c.remoteAddr }
-
-// SetDeadline functions implement the net.Conn interface for conn.
-func (c *conn) SetDeadline(_ time.Time) error      { return errDeadlinesNotImplemented }
-func (c *conn) SetReadDeadline(_ time.Time) error  { return errDeadlinesNotImplemented }
-func (c *conn) SetWriteDeadline(_ time.Time) error { return errDeadlinesNotImplemented }
-
-// Read, Write and Close implement the net.Conn interface for conn.
-func (c *conn) Read(b []byte) (n int, err error)  { return c.file.Read(b) }
-func (c *conn) Write(b []byte) (n int, err error) { return c.file.Write(b) }
-func (c *conn) Close() error                      { return c.file.Close() }
+// Implement net.Conn for type conn.
+func (c *conn) LocalAddr() net.Addr                { return c.localAddr }
+func (c *conn) RemoteAddr() net.Addr               { return c.remoteAddr }
+func (c *conn) SetDeadline(t time.Time) error      { return c.file.SetDeadline(t) }
+func (c *conn) SetReadDeadline(t time.Time) error  { return c.file.SetReadDeadline(t) }
+func (c *conn) SetWriteDeadline(t time.Time) error { return c.file.SetWriteDeadline(t) }
+func (c *conn) Read(b []byte) (n int, err error)   { return c.file.Read(b) }
+func (c *conn) Write(b []byte) (n int, err error)  { return c.file.Write(b) }
+func (c *conn) Close() error                       { return c.file.Close() }
 
 // dialStream is the entry point for DialStream on Linux.
 func dialStream(cid, port uint32) (net.Conn, error) {
@@ -92,6 +79,12 @@ func dialStreamLinux(cfd fd, cid, port uint32) (net.Conn, error) {
 	remoteAddr := &Addr{
 		ContextID: cid,
 		Port:      port,
+	}
+
+	// Enable integration with runtime network poller for timeout support
+	// in Go 1.11+.
+	if err := cfd.SetNonblock(true); err != nil {
+		return nil, err
 	}
 
 	return &conn{
