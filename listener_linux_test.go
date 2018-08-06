@@ -76,29 +76,33 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		Port: port,
 	}
 
-	bindFn := func(sa unix.Sockaddr) error {
-		if want, got := lsa, sa; !reflect.DeepEqual(want, got) {
-			t.Fatalf("unexpected bind sockaddr:\n- want: %#v\n-  got: %#v",
-				want, got)
-		}
-
-		return nil
-	}
-
-	listenFn := func(n int) error {
-		if want, got := listenBacklog, n; want != got {
-			t.Fatalf("unexpected listen backlog:\n- want: %d\n-  got: %d",
-				want, got)
-		}
-
-		return nil
-	}
-
 	lfd := &testFD{
-		bind:   bindFn,
-		listen: listenFn,
+		bind: func(sa unix.Sockaddr) error {
+			if want, got := lsa, sa; !reflect.DeepEqual(want, got) {
+				t.Fatalf("unexpected bind sockaddr:\n- want: %#v\n-  got: %#v",
+					want, got)
+			}
+
+			return nil
+		},
+		listen: func(n int) error {
+			if want, got := listenBacklog, n; want != got {
+				t.Fatalf("unexpected listen backlog:\n- want: %d\n-  got: %d",
+					want, got)
+			}
+
+			return nil
+		},
 		getsockname: func() (unix.Sockaddr, error) {
 			return lsa, nil
+		},
+		setNonblock: func(nonblocking bool) error {
+			if want, got := true, nonblocking; !reflect.DeepEqual(want, got) {
+				t.Fatalf("unexpected set nonblocking value:\n- want: %#v\n-  got: %#v",
+					want, got)
+			}
+
+			return nil
 		},
 	}
 
@@ -136,6 +140,13 @@ func Test_listenerAccept(t *testing.T) {
 		acceptFD := &testFD{
 			newFile: func(name string) *os.File {
 				return os.NewFile(connFD, name)
+			},
+			setNonblock: func(nonblocking bool) error {
+				if want, got := true, nonblocking; !reflect.DeepEqual(want, got) {
+					t.Fatalf("unexpected set nonblocking value:\n- want: %#v\n-  got: %#v",
+						want, got)
+				}
+				return nil
 			},
 		}
 
