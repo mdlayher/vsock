@@ -35,17 +35,7 @@ func (l *listener) Accept() (net.Conn, error) {
 		Port:      savm.Port,
 	}
 
-	// Enable integration with runtime network poller for timeout support
-	// in Go 1.11+.
-	if err := cfd.SetNonblock(true); err != nil {
-		return nil, err
-	}
-
-	return &conn{
-		file:       cfd.NewFile(l.addr.fileName()),
-		localAddr:  l.addr,
-		remoteAddr: remoteAddr,
-	}, nil
+	return newConn(cfd, l.addr.fileName(), l.addr, remoteAddr)
 }
 
 // listenStream is the entry point for ListenStream on Linux.

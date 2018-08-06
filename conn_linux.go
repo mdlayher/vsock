@@ -29,6 +29,22 @@ func (c *conn) Read(b []byte) (n int, err error)   { return c.file.Read(b) }
 func (c *conn) Write(b []byte) (n int, err error)  { return c.file.Write(b) }
 func (c *conn) Close() error                       { return c.file.Close() }
 
+// newConn creates a conn using an fd with the specified file name, local, and
+// remote addresses.
+func newConn(cfd fd, file string, local, remote *Addr) (*conn, error) {
+	// Enable integration with runtime network poller for timeout support
+	// in Go 1.11+.
+	if err := cfd.SetNonblock(true); err != nil {
+		return nil, err
+	}
+
+	return &conn{
+		file:       cfd.NewFile(file),
+		localAddr:  local,
+		remoteAddr: remote,
+	}, nil
+}
+
 // dialStream is the entry point for DialStream on Linux.
 func dialStream(cid, port uint32) (net.Conn, error) {
 	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
@@ -81,15 +97,6 @@ func dialStreamLinux(cfd fd, cid, port uint32) (net.Conn, error) {
 		Port:      port,
 	}
 
-	// Enable integration with runtime network poller for timeout support
-	// in Go 1.11+.
-	if err := cfd.SetNonblock(true); err != nil {
-		return nil, err
-	}
-
-	return &conn{
-		file:       cfd.NewFile(remoteAddr.fileName()),
-		localAddr:  localAddr,
-		remoteAddr: remoteAddr,
-	}, nil
+	// File name is the name of the local socket.
+	return newConn(cfd, localAddr.fileName(), localAddr, remoteAddr)
 }
