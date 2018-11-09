@@ -10,7 +10,11 @@ import (
 )
 
 func Test_listenStreamLinuxHandleError(t *testing.T) {
-	var closed bool
+	var (
+		closed      bool
+		nonblocking bool
+	)
+
 	lfd := &testFD{
 		// Track when fd.Close is called.
 		close: func() error {
@@ -21,10 +25,19 @@ func Test_listenStreamLinuxHandleError(t *testing.T) {
 		bind: func(sa unix.Sockaddr) error {
 			return errors.New("error during bind")
 		},
+		setNonblock: func(n bool) error {
+			nonblocking = n
+			return nil
+		},
 	}
 
 	if _, err := listenStreamLinuxHandleError(lfd, 0, 0); err == nil {
 		t.Fatal("expected an error, but none occurred")
+	}
+
+	if want, got := true, nonblocking; want != got {
+		t.Fatalf("unexpected nonblocking value:\n- want: %v\n-  got: %v",
+			want, got)
 	}
 
 	if want, got := true, closed; want != got {
@@ -58,6 +71,7 @@ func Test_listenStreamLinuxPortZero(t *testing.T) {
 		bind:        bindFn,
 		listen:      func(n int) error { return nil },
 		getsockname: func() (unix.Sockaddr, error) { return lsa, nil },
+		setNonblock: func(n bool) error { return nil },
 	}
 
 	if _, err := listenStreamLinux(lfd, cid, port); err != nil {
