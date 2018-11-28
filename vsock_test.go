@@ -4,6 +4,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestAddr_fileName(t *testing.T) {
@@ -65,12 +67,15 @@ func TestUnblockAcceptAfterClose(t *testing.T) {
 		t.Log("start accept")
 		_, err := listener.Accept()
 		t.Log("after accept")
-		if err != nil {
-			return
+
+		if err == nil {
+			t.Error("accept should return an error, got nil")
+		} else if err != unix.EWOULDBLOCK {
+			t.Errorf("unexpected error '%v' != '%v'", err, unix.EWOULDBLOCK)
 		}
 	}()
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	if err := listener.Close(); err != nil {
 		t.Fatalf("failed to close listener: %v", err)
