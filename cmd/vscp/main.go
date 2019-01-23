@@ -105,7 +105,6 @@ func receive(target string, port uint32) {
 		time.Sleep(time.Second)
 	}
 	defer c.Close()
-	defer c.Close()
 
 	logf("server: %s", c.LocalAddr())
 	logf("client: %s", c.RemoteAddr())
