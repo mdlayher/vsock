@@ -92,10 +92,19 @@ func receive(target string, port uint32) {
 	log.Printf("receive: listening: %s", l.Addr())
 
 	// Accept a single connection, and receive stream from that connection.
-	c, err := l.Accept()
-	if err != nil {
-		fatalf("failed to accept: %v", err)
+	// socket.Accept() is now a non-blocking function thus - this must be changed to some kind of a checking loop.
+	for {
+		c, err := l.Accept()
+		if err != nil && err != "resource temporarily unavailable" {
+			fatalf("failed to accept: %v", err)
+		} else if err != nil {
+			// this means that the accept succeeded 
+			break
+		}
+		// sleep for a second to not exhaust the machine
+		time.Sleep(time.Second)
 	}
+	defer c.Close()
 	defer c.Close()
 
 	logf("server: %s", c.LocalAddr())
