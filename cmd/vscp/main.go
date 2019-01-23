@@ -104,7 +104,7 @@ func receive(target string, port uint32) {
 			fatalf("failed to accept: %v", err)
 		}
                 c, err = l.Accept()
-                // sleep for a second to not exhaust the machine
+                // sleep to not exhaust the machine
                 time.Sleep(100 * time.Millisecond)
         }
 
