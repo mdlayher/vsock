@@ -95,9 +95,7 @@ func receive(target string, port uint32) {
 	// socket.Accept() is now a non-blocking function thus - this must be changed to some kind of a checking loop.
 	for {
 		c, err := l.Accept()
-		if err != nil && err != "resource temporarily unavailable" {
-			fatalf("failed to accept: %v", err)
-		} else if err != nil {
+		if err == nil {
 			// this means that the accept succeeded 
 			break
 		}
