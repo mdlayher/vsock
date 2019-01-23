@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/mdlayher/vsock"
 )
@@ -93,15 +94,17 @@ func receive(target string, port uint32) {
 
 	// Accept a single connection, and receive stream from that connection.
 	// socket.Accept() is now a non-blocking function thus - this must be changed to some kind of a checking loop.
-	for {
-		c, err := l.Accept()
-		if err == nil {
-			// this means that the accept succeeded 
-			break
-		}
-		// sleep for a second to not exhaust the machine
-		time.Sleep(time.Second)
-	}
+	c, err := l.Accept()
+        for {
+                if err == nil {
+                        // this means that the accept succeeded 
+                        break
+                }
+                c, err = l.Accept()
+                // sleep for a second to not exhaust the machine
+                time.Sleep(time.Second)
+        }
+
 	defer c.Close()
 
 	logf("server: %s", c.LocalAddr())
