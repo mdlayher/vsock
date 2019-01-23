@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"golang.org/x/sys/unix"
 	"github.com/mdlayher/vsock"
 )
 
@@ -99,10 +100,12 @@ func receive(target string, port uint32) {
                 if err == nil {
                         // this means that the accept succeeded 
                         break
-                }
+		} else if err != unix.EWOULDBLOCK {
+			fatalf("failed to accept: %v", err)
+		}
                 c, err = l.Accept()
                 // sleep for a second to not exhaust the machine
-                time.Sleep(time.Second)
+                time.Sleep(100 * time.Millisecond)
         }
 
 	defer c.Close()
