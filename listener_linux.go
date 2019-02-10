@@ -83,7 +83,7 @@ func listenStreamLinux(lfd fd, cid, port uint32) (net.Listener, error) {
 		Port: port,
 	}
 
-	if err := lfd.SetNonblock(true); err != nil {
+	if err := lfd.SetNonblock(false); err != nil {
 		return nil, err
 	}
 
