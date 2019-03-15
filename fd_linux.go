@@ -110,6 +110,12 @@ func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
 func (lfd *sysListenFD) Close() error {
 	lfd.check()
 
+	// It is possible that Close will be called before a transition to
+	// non-blocking mode in Accept.
+	if lfd.f == nil {
+		return unix.Close(lfd.fd)
+	}
+
 	var err error
 	doErr := fdcontrol(lfd.f, func(fd int) {
 		err = unix.Close(fd)
