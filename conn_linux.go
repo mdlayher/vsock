@@ -31,7 +31,7 @@ func (c *conn) Close() error                       { return c.fd.Close() }
 // newConn creates a conn using an connFD, immediately setting the connFD to
 // non-blocking mode for use with the runtime network poller.
 func newConn(cfd connFD, local, remote *Addr) (*conn, error) {
-	if err := cfd.SetNonblocking("vsock " + local.String()); err != nil {
+	if err := cfd.SetNonblocking(local.fileName()); err != nil {
 		return nil, err
 	}
 
