@@ -67,52 +67,20 @@ func (lfd *sysListenFD) EarlyClose() error { return unix.Close(lfd.fd) }
 // Non-blocking mode methods.
 
 func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
-	rc, err := lfd.f.SyscallConn()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var (
-		nfd int
-		sa  unix.Sockaddr
-	)
-
-	doErr := rc.Read(func(fd uintptr) bool {
-		nfd, sa, err = unix.Accept4(int(fd), flags)
-
-		switch err {
-		case unix.EAGAIN, unix.ECONNABORTED:
-			// Return false to let the poller wait for readiness. See the
-			// source code for internal/poll.FD.RawRead for more details.
-			//
-			// When the socket is in non-blocking mode, we might see EAGAIN if
-			// the socket is not ready for reading.
-			//
-			// In addition, the network poller's accept implementation also
-			// deals with ECONNABORTED, in case a socket is closed before it is
-			// pulled from our listen queue.
-			return false
-		default:
-			// No error or some unrecognized error, treat this Read operation
-			// as completed.
-			return true
-		}
-	})
-	if doErr != nil {
-		return nil, nil, doErr
-	}
+	// Invoke Go version-specific logic for accept.
+	newFD, sa, err := lfd.accept4(flags)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Create a non-blocking connFD which will be used to implement net.Conn.
-	cfd := &sysConnFD{fd: nfd}
+	cfd := &sysConnFD{fd: newFD}
 	return cfd, sa, nil
 }
 
 func (lfd *sysListenFD) Close() error {
-	// *os.File.Close will also close the runtime network poller file descriptor,
-	// so that net.Listener.Accept can stop blocking.
+	// In Go 1.12+, *os.File.Close will also close the runtime network poller
+	// file descriptor, so that net.Listener.Accept can stop blocking.
 	return lfd.f.Close()
 }
 

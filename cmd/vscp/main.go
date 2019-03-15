@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mdlayher/vsock"
+	"github.com/mdlayher/vsock/internal/vsutil"
 )
 
 var (
@@ -91,25 +92,14 @@ func receive(target string, port uint32, timeout time.Duration) {
 	}
 	defer l.Close()
 
-	// If a timeout is set, set up a timer to close the listener and unblock
-	// the call to Accept once the timeout passes.
-	timeoutCancel := func() {}
-	if timeout != 0 {
-		timer := time.AfterFunc(timeout, func() { _ = l.Close() })
-		timeoutCancel = func() { timer.Stop() }
-	}
-
 	// Show server's address for setting up client flags.
 	log.Printf("receive: listening: %s", l.Addr())
 
 	// Accept a single connection, and receive stream from that connection.
-	c, err := l.Accept()
+	c, err := vsutil.Accept(l, timeout)
 	if err != nil {
 		fatalf("failed to accept: %v", err)
 	}
-
-	// Got a connection, no need to cancel the listener.
-	timeoutCancel()
 	defer c.Close()
 
 	if timeout != 0 {

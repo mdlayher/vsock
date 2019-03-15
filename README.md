@@ -6,14 +6,32 @@ communication between a hypervisor and its virtual machines.  MIT Licensed.
 For more information about VM sockets, check out my blog about
 [Linux VM sockets in Go](https://medium.com/@mdlayher/linux-vm-sockets-in-go-ea11768e9e67).
 
+## Go version support
+
+This package supports varying levels of functionality depending on the version
+of Go used during compilation. The `net.Listener` and `net.Conn` types produced
+by this package are backed by non-blocking I/O, in order to integrate with Go's
+runtime network poller in newer versions of Go.
+
+- **Go 1.12.x+ (recommended):**
+  - `net.Listener`:
+    - `Accept` blocks until a connection is received
+    - `Close` can interrupt `Accept` and make it return a permanent error
+  - `net.Conn`: full timeout support via `SetDeadline` family of methods
+- Go 1.11.x **(not recommended)**:
+  - `net.Listener`:
+    - `Accept` is **non-blocking** and should be called in a loop, checking for
+      `net.Error.Temporary() == true` and sleeping for a short period to avoid
+      wasteful, spinning CPU cycles
+    - `Close` makes `Accept` return a permanent error on the next
+      loop iteration
+  - `net.Conn`: full timeout support via `SetDeadline` family of methods
+- Go 1.10.x or below: **not supported**
+
 ## Stability
 
 At this time, package `vsock` is in a pre-v1.0.0 state. Changes are being made
 which may impact the exported API of this package and others in its ecosystem.
-
-The general policy of this package is to only support the latest, stable version
-of Go. Compatibility shims may be added for prior versions of Go on an as-needed
-basis. If you would like to raise a concern, please [file an issue](https://github.com/mdlayher/vsock/issues/new).
 
 **If you depend on this package in your applications, please vendor it or use Go
 modules when building your application.**

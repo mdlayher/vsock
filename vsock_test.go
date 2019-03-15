@@ -1,11 +1,14 @@
 package vsock
 
 import (
+	"net"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mdlayher/vsock/internal/vsutil"
 )
 
 func TestAddr_fileName(t *testing.T) {
@@ -71,9 +74,21 @@ func TestUnblockAcceptAfterClose(t *testing.T) {
 		defer wg.Done()
 
 		t.Log("start accept")
-		_, err := listener.Accept()
+		_, err := vsutil.Accept(listener, 10*time.Second)
 		t.Log("after accept")
 
+		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+			t.Errorf("expected permanent error, but got temporary one: %v", err)
+		}
+
+		// Go1.11:
+		if strings.Contains(err.Error(), "bad file descriptor") {
+			// All is well, the file descriptor was closed.
+			return
+		}
+
+		// Go 1.12+:
+		// TODO(mdlayher): wrap string error in net.OpError or similar.
 		if !strings.Contains(err.Error(), "use of closed file") {
 			t.Errorf("unexpected accept error: %v", err)
 		}
