@@ -4,7 +4,6 @@ package vsock
 
 import (
 	"net"
-	"os"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -14,7 +13,7 @@ var _ net.Conn = &conn{}
 
 // A conn is the net.Conn implementation for VM sockets.
 type conn struct {
-	file       *os.File
+	fd         connFD
 	localAddr  *Addr
 	remoteAddr *Addr
 }
@@ -22,24 +21,18 @@ type conn struct {
 // Implement net.Conn for type conn.
 func (c *conn) LocalAddr() net.Addr                { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr               { return c.remoteAddr }
-func (c *conn) SetDeadline(t time.Time) error      { return c.file.SetDeadline(t) }
-func (c *conn) SetReadDeadline(t time.Time) error  { return c.file.SetReadDeadline(t) }
-func (c *conn) SetWriteDeadline(t time.Time) error { return c.file.SetWriteDeadline(t) }
-func (c *conn) Read(b []byte) (n int, err error)   { return c.file.Read(b) }
-func (c *conn) Write(b []byte) (n int, err error)  { return c.file.Write(b) }
-func (c *conn) Close() error                       { return c.file.Close() }
+func (c *conn) SetDeadline(t time.Time) error      { return c.fd.SetDeadline(t) }
+func (c *conn) SetReadDeadline(t time.Time) error  { return c.fd.SetReadDeadline(t) }
+func (c *conn) SetWriteDeadline(t time.Time) error { return c.fd.SetWriteDeadline(t) }
+func (c *conn) Read(b []byte) (n int, err error)   { return c.fd.Read(b) }
+func (c *conn) Write(b []byte) (n int, err error)  { return c.fd.Write(b) }
+func (c *conn) Close() error                       { return c.fd.Close() }
 
 // newConn creates a conn using an fd with the specified file name, local, and
 // remote addresses.
-func newConn(cfd fd, file string, local, remote *Addr) (*conn, error) {
-	// Enable integration with runtime network poller for timeout support
-	// in Go 1.11+.
-	if err := cfd.SetNonblock(true); err != nil {
-		return nil, err
-	}
-
+func newConn(cfd connFD, file string, local, remote *Addr) (*conn, error) {
 	return &conn{
-		file:       cfd.NewFile(file),
+		fd:         cfd,
 		localAddr:  local,
 		remoteAddr: remote,
 	}, nil
@@ -52,14 +45,35 @@ func dialStream(cid, port uint32) (net.Conn, error) {
 		return nil, err
 	}
 
-	cfd := &sysFD{fd: fd}
-	return dialStreamLinuxHandleError(cfd, cid, port)
+	rsa := &unix.SockaddrVM{
+		CID:  cid,
+		Port: port,
+	}
+
+	if err := unix.Connect(fd, rsa); err != nil {
+		return nil, err
+	}
+
+	lsa, err := unix.Getsockname(fd)
+	//lsa, err := cfd.Getsockname()
+	if err != nil {
+		return nil, err
+	}
+
+	cfd, err := newConnFD(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	lsavm := lsa.(*unix.SockaddrVM)
+
+	return dialStreamLinuxHandleError(cfd, cid, port, lsavm)
 }
 
 // dialStreamLinuxHandleError ensures that any errors from dialStreamLinux result
 // in the socket being cleaned up properly.
-func dialStreamLinuxHandleError(cfd fd, cid, port uint32) (net.Conn, error) {
-	c, err := dialStreamLinux(cfd, cid, port)
+func dialStreamLinuxHandleError(cfd connFD, cid, port uint32, lsa *unix.SockaddrVM) (net.Conn, error) {
+	c, err := dialStreamLinux(cfd, cid, port, lsa)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
 		// to avoid file descriptor leaks.
@@ -71,25 +85,10 @@ func dialStreamLinuxHandleError(cfd fd, cid, port uint32) (net.Conn, error) {
 }
 
 // dialStreamLinux is the entry point for tests on Linux.
-func dialStreamLinux(cfd fd, cid, port uint32) (net.Conn, error) {
-	rsa := &unix.SockaddrVM{
-		CID:  cid,
-		Port: port,
-	}
-
-	if err := cfd.Connect(rsa); err != nil {
-		return nil, err
-	}
-
-	lsa, err := cfd.Getsockname()
-	if err != nil {
-		return nil, err
-	}
-
-	lsavm := lsa.(*unix.SockaddrVM)
+func dialStreamLinux(cfd connFD, cid, port uint32, lsa *unix.SockaddrVM) (net.Conn, error) {
 	localAddr := &Addr{
-		ContextID: lsavm.CID,
-		Port:      lsavm.Port,
+		ContextID: lsa.CID,
+		Port:      lsa.Port,
 	}
 
 	remoteAddr := &Addr{

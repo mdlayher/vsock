@@ -13,7 +13,7 @@ var _ net.Listener = &listener{}
 // A listener is the net.Listener implementation for connection-oriented
 // VM sockets.
 type listener struct {
-	fd   fd
+	fd   listenFD
 	addr *Addr
 }
 
@@ -45,18 +45,17 @@ func listenStream(port uint32) (net.Listener, error) {
 		return nil, err
 	}
 
-	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	lfd, err := newListenFD()
 	if err != nil {
 		return nil, err
 	}
 
-	lfd := &sysFD{fd: fd}
 	return listenStreamLinuxHandleError(lfd, cid, port)
 }
 
 // listenStreamLinuxHandleError ensures that any errors from listenStreamLinux
 // result in the socket being cleaned up properly.
-func listenStreamLinuxHandleError(lfd fd, cid, port uint32) (net.Listener, error) {
+func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (net.Listener, error) {
 	l, err := listenStreamLinux(lfd, cid, port)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
@@ -72,7 +71,7 @@ func listenStreamLinuxHandleError(lfd fd, cid, port uint32) (net.Listener, error
 const listenBacklog = 32
 
 // listenStreamLinux is the entry point for tests on Linux.
-func listenStreamLinux(lfd fd, cid, port uint32) (net.Listener, error) {
+func listenStreamLinux(lfd listenFD, cid, port uint32) (net.Listener, error) {
 	// Zero-value for "any port" is friendlier in Go than a constant.
 	if port == 0 {
 		port = unix.VMADDR_PORT_ANY
@@ -81,10 +80,6 @@ func listenStreamLinux(lfd fd, cid, port uint32) (net.Listener, error) {
 	sa := &unix.SockaddrVM{
 		CID:  cid,
 		Port: port,
-	}
-
-	if err := lfd.SetNonblock(true); err != nil {
-		return nil, err
 	}
 
 	if err := lfd.Bind(sa); err != nil {
