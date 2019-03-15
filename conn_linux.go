@@ -28,9 +28,13 @@ func (c *conn) Read(b []byte) (n int, err error)   { return c.fd.Read(b) }
 func (c *conn) Write(b []byte) (n int, err error)  { return c.fd.Write(b) }
 func (c *conn) Close() error                       { return c.fd.Close() }
 
-// newConn creates a conn using an fd with the specified file name, local, and
-// remote addresses.
-func newConn(cfd connFD, file string, local, remote *Addr) (*conn, error) {
+// newConn creates a conn using an connFD, immediately setting the connFD to
+// non-blocking mode for use with the runtime network poller.
+func newConn(cfd connFD, local, remote *Addr) (*conn, error) {
+	if err := cfd.SetNonblocking("vsock " + local.String()); err != nil {
+		return nil, err
+	}
+
 	return &conn{
 		fd:         cfd,
 		localAddr:  local,
@@ -40,40 +44,18 @@ func newConn(cfd connFD, file string, local, remote *Addr) (*conn, error) {
 
 // dialStream is the entry point for DialStream on Linux.
 func dialStream(cid, port uint32) (net.Conn, error) {
-	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	cfd, err := newConnFD()
 	if err != nil {
 		return nil, err
 	}
 
-	rsa := &unix.SockaddrVM{
-		CID:  cid,
-		Port: port,
-	}
-
-	if err := unix.Connect(fd, rsa); err != nil {
-		return nil, err
-	}
-
-	lsa, err := unix.Getsockname(fd)
-	//lsa, err := cfd.Getsockname()
-	if err != nil {
-		return nil, err
-	}
-
-	cfd, err := newConnFD(fd)
-	if err != nil {
-		return nil, err
-	}
-
-	lsavm := lsa.(*unix.SockaddrVM)
-
-	return dialStreamLinuxHandleError(cfd, cid, port, lsavm)
+	return dialStreamLinuxHandleError(cfd, cid, port)
 }
 
 // dialStreamLinuxHandleError ensures that any errors from dialStreamLinux result
 // in the socket being cleaned up properly.
-func dialStreamLinuxHandleError(cfd connFD, cid, port uint32, lsa *unix.SockaddrVM) (net.Conn, error) {
-	c, err := dialStreamLinux(cfd, cid, port, lsa)
+func dialStreamLinuxHandleError(cfd connFD, cid, port uint32) (net.Conn, error) {
+	c, err := dialStreamLinux(cfd, cid, port)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
 		// to avoid file descriptor leaks.
@@ -85,17 +67,32 @@ func dialStreamLinuxHandleError(cfd connFD, cid, port uint32, lsa *unix.Sockaddr
 }
 
 // dialStreamLinux is the entry point for tests on Linux.
-func dialStreamLinux(cfd connFD, cid, port uint32, lsa *unix.SockaddrVM) (net.Conn, error) {
-	localAddr := &Addr{
-		ContextID: lsa.CID,
-		Port:      lsa.Port,
+func dialStreamLinux(cfd connFD, cid, port uint32) (net.Conn, error) {
+	rsa := &unix.SockaddrVM{
+		CID:  cid,
+		Port: port,
 	}
 
-	remoteAddr := &Addr{
+	if err := cfd.Connect(rsa); err != nil {
+		return nil, err
+	}
+
+	lsa, err := cfd.Getsockname()
+	if err != nil {
+		return nil, err
+	}
+
+	lsavm := lsa.(*unix.SockaddrVM)
+
+	local := &Addr{
+		ContextID: lsavm.CID,
+		Port:      lsavm.Port,
+	}
+
+	remote := &Addr{
 		ContextID: cid,
 		Port:      port,
 	}
 
-	// File name is the name of the local socket.
-	return newConn(cfd, localAddr.fileName(), localAddr, remoteAddr)
+	return newConn(cfd, local, remote)
 }

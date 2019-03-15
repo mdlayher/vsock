@@ -30,12 +30,12 @@ func (l *listener) Accept() (net.Conn, error) {
 	}
 
 	savm := sa.(*unix.SockaddrVM)
-	remoteAddr := &Addr{
+	remote := &Addr{
 		ContextID: savm.CID,
 		Port:      savm.Port,
 	}
 
-	return newConn(cfd, l.addr.fileName(), l.addr, remoteAddr)
+	return newConn(cfd, l.addr, remote)
 }
 
 // listenStream is the entry point for ListenStream on Linux.

@@ -99,10 +99,8 @@ func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
 	}
 
 	// Create a non-blocking connFD which will be used to implement net.Conn.
-	cfd, err := newConnFD(nfd)
-	if err != nil {
-		return nil, nil, err
-	}
+	cfd := &sysConnFD{fd: nfd}
+	cfd.check()
 
 	return cfd, sa, nil
 }
@@ -141,7 +139,9 @@ func (lfd *sysListenFD) check() {
 // calls or swap them out for tests.
 type connFD interface {
 	io.ReadWriteCloser
+	Connect(sa unix.Sockaddr) error
 	Getsockname() (unix.Sockaddr, error)
+	SetNonblocking(name string) error
 	SetDeadline(t time.Time) error
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
@@ -149,43 +149,63 @@ type connFD interface {
 
 var _ connFD = &sysConnFD{}
 
-func newConnFD(fd int) (*sysConnFD, error) {
-	if err := unix.SetNonblock(fd, true); err != nil {
-		_ = unix.Close(fd)
+func newConnFD() (*sysConnFD, error) {
+	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	if err != nil {
 		return nil, err
 	}
 
 	return &sysConnFD{
-		f: os.NewFile(uintptr(fd), "vsock"),
+		fd: fd,
 	}, nil
 }
 
 // sysConnFD is the system call implementation of fd.
 type sysConnFD struct {
-	f *os.File
+	// These fields should never be non-zero at the same time.
+	fd int      // Used in blocking mode.
+	f  *os.File // Used in non-blocking mode.
+}
+
+// Blocking mode methods.
+
+func (cfd *sysConnFD) Connect(sa unix.Sockaddr) error {
+	cfd.check()
+	return unix.Connect(cfd.fd, sa)
 }
 
 func (cfd *sysConnFD) Getsockname() (unix.Sockaddr, error) {
-	var (
-		sa  unix.Sockaddr
-		err error
-	)
+	cfd.check()
+	return unix.Getsockname(cfd.fd)
+}
 
-	doErr := fdcontrol(cfd.f, func(fd int) {
-		sa, err = unix.Getsockname(fd)
-	})
-	if doErr != nil {
-		return nil, doErr
+func (cfd *sysConnFD) SetNonblocking(name string) error {
+	// From now on, we must perform non-blocking I/O, so that our deadline
+	// methods work, and the connection can be interrupted by net.Conn.Close.
+	if err := unix.SetNonblock(cfd.fd, true); err != nil {
+		return err
 	}
 
-	return sa, err
+	// Transition from blocking mode to non-blocking mode, and ensure invariants
+	// are not violated.
+	cfd.f = os.NewFile(uintptr(cfd.fd), name)
+	cfd.fd = 0
+	cfd.check()
+
+	return nil
 }
 
-func (cfd *sysConnFD) File() *os.File {
-	return cfd.f
-}
+// Non-blocking mode methods.
 
 func (cfd *sysConnFD) Close() error {
+	cfd.check()
+
+	// It is possible that Close will be called before a transition to
+	// non-blocking mode in SetNonblocking.
+	if cfd.f == nil {
+		return unix.Close(cfd.fd)
+	}
+
 	var err error
 	doErr := fdcontrol(cfd.f, func(fd int) {
 		err = unix.Close(fd)
@@ -200,8 +220,11 @@ func (cfd *sysConnFD) Close() error {
 }
 
 func (cfd *sysConnFD) Read(b []byte) (int, error) {
+	cfd.check()
+
 	n, err := cfd.f.Read(b)
 	if err != nil {
+		// "transport not connected" means io.EOF in Go.
 		if perr, ok := err.(*os.PathError); ok && perr.Err == unix.ENOTCONN {
 			return n, io.EOF
 		}
@@ -210,17 +233,39 @@ func (cfd *sysConnFD) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func (cfd *sysConnFD) Write(b []byte) (int, error)        { return cfd.f.Write(b) }
-func (cfd *sysConnFD) SetDeadline(t time.Time) error      { return cfd.f.SetDeadline(t) }
-func (cfd *sysConnFD) SetReadDeadline(t time.Time) error  { return cfd.f.SetReadDeadline(t) }
-func (cfd *sysConnFD) SetWriteDeadline(t time.Time) error { return cfd.f.SetWriteDeadline(t) }
+func (cfd *sysConnFD) Write(b []byte) (int, error) {
+	cfd.check()
+	return cfd.f.Write(b)
+}
+
+func (cfd *sysConnFD) SetDeadline(t time.Time) error {
+	cfd.check()
+	return cfd.f.SetDeadline(t)
+}
+
+func (cfd *sysConnFD) SetReadDeadline(t time.Time) error {
+	cfd.check()
+	return cfd.f.SetReadDeadline(t)
+}
+
+func (cfd *sysConnFD) SetWriteDeadline(t time.Time) error {
+	cfd.check()
+	return cfd.f.SetWriteDeadline(t)
+}
+
+func (cfd *sysConnFD) check() {
+	// Verify that both file descriptor states cannot exist at the same time.
+	if cfd.fd != 0 && cfd.f != nil {
+		panic("vsock: sysConnFD blocking to non-blocking mode transition invariant violation, please file a bug: https://github.com/mdlayher/vsock")
+	}
+}
 
 func fdcontrol(fd *os.File, f func(int)) error {
 	rc, err := fd.SyscallConn()
 	if err != nil {
 		return err
 	}
-	return rc.Control(func(sysConnFD uintptr) {
-		f(int(sysConnFD))
+	return rc.Control(func(fd uintptr) {
+		f(int(fd))
 	})
 }
