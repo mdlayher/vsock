@@ -135,8 +135,7 @@ func (lfd *sysListenFD) check() {
 	}
 }
 
-// A fd is an interface for a file descriptor, used to perform system
-// calls or swap them out for tests.
+// A connFD is a type that wraps a file descriptor used to implement net.Conn.
 type connFD interface {
 	io.ReadWriteCloser
 	Connect(sa unix.Sockaddr) error
@@ -149,6 +148,7 @@ type connFD interface {
 
 var _ connFD = &sysConnFD{}
 
+// newConnFD creates a sysConnFD in its default blocking mode.
 func newConnFD() (*sysConnFD, error) {
 	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
 	if err != nil {
@@ -160,7 +160,7 @@ func newConnFD() (*sysConnFD, error) {
 	}, nil
 }
 
-// sysConnFD is the system call implementation of fd.
+// A sysConnFD is the system call implementation of connFD.
 type sysConnFD struct {
 	// These fields should never be non-zero at the same time.
 	fd int      // Used in blocking mode.
