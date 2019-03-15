@@ -80,11 +80,23 @@ func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
 	doErr := rc.Read(func(fd uintptr) bool {
 		nfd, sa, err = unix.Accept4(int(fd), flags)
 
-		// When the socket is in non-blocking mode, we might see
-		// EAGAIN and end up here. In that case, return false to
-		// let the poller wait for readiness. See the source code
-		// for internal/poll.FD.RawRead for more details.
-		return err != unix.EAGAIN
+		switch err {
+		case unix.EAGAIN, unix.ECONNABORTED:
+			// Return false to let the poller wait for readiness. See the
+			// source code for internal/poll.FD.RawRead for more details.
+			//
+			// When the socket is in non-blocking mode, we might see EAGAIN if
+			// the socket is not ready for reading.
+			//
+			// In addition, the network poller's accept implementation also
+			// deals with ECONNABORTED, in case a socket is closed before it is
+			// pulled from our listen queue.
+			return false
+		default:
+			// No error or some unrecognized error, treat this Read operation
+			// as completed.
+			return true
+		}
 	})
 	if doErr != nil {
 		return nil, nil, doErr
@@ -99,19 +111,9 @@ func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
 }
 
 func (lfd *sysListenFD) Close() error {
-	var err error
-	doErr := fdcontrol(lfd.f, func(fd int) {
-		err = unix.Close(fd)
-	})
-	if doErr != nil {
-		return doErr
-	}
-
-	// We must also close the runtime network poller file descriptor for
-	// net.Listener.Accept to stop blocking.
-	_ = lfd.f.Close()
-
-	return err
+	// *os.File.Close will also close the runtime network poller file descriptor,
+	// so that net.Listener.Accept can stop blocking.
+	return lfd.f.Close()
 }
 
 // A connFD is a type that wraps a file descriptor used to implement net.Conn.
@@ -172,17 +174,9 @@ func (cfd *sysConnFD) SetNonblocking(name string) error {
 // Non-blocking mode methods.
 
 func (cfd *sysConnFD) Close() error {
-	var err error
-	doErr := fdcontrol(cfd.f, func(fd int) {
-		err = unix.Close(fd)
-	})
-	if doErr != nil {
-		return doErr
-	}
-
-	_ = cfd.f.Close()
-
-	return err
+	// *os.File.Close will also close the runtime network poller file descriptor,
+	// so that read/write can stop blocking.
+	return cfd.f.Close()
 }
 
 func (cfd *sysConnFD) Read(b []byte) (int, error) {
@@ -201,13 +195,3 @@ func (cfd *sysConnFD) Write(b []byte) (int, error)        { return cfd.f.Write(b
 func (cfd *sysConnFD) SetDeadline(t time.Time) error      { return cfd.f.SetDeadline(t) }
 func (cfd *sysConnFD) SetReadDeadline(t time.Time) error  { return cfd.f.SetReadDeadline(t) }
 func (cfd *sysConnFD) SetWriteDeadline(t time.Time) error { return cfd.f.SetWriteDeadline(t) }
-
-func fdcontrol(fd *os.File, f func(int)) error {
-	rc, err := fd.SyscallConn()
-	if err != nil {
-		return err
-	}
-	return rc.Control(func(fd uintptr) {
-		f(int(fd))
-	})
-}
