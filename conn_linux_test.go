@@ -4,16 +4,15 @@ package vsock
 
 import (
 	"errors"
-	"os"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 )
 
 func Test_dialStreamLinuxHandleError(t *testing.T) {
 	var closed bool
-	lfd := &testFD{
+	cfd := &testConnFD{
 		// Track when fd.Close is called.
 		close: func() error {
 			closed = true
@@ -25,21 +24,19 @@ func Test_dialStreamLinuxHandleError(t *testing.T) {
 		},
 	}
 
-	if _, err := dialStreamLinuxHandleError(lfd, 0, 0); err == nil {
+	if _, err := dialStreamLinuxHandleError(cfd, 0, 0); err == nil {
 		t.Fatal("expected an error, but none occurred")
 	}
 
-	if want, got := true, closed; want != got {
-		t.Fatalf("unexpected socket close value:\n- want: %v\n-  got: %v",
-			want, got)
+	if diff := cmp.Diff(true, closed); diff != "" {
+		t.Fatalf("unexpected closed value (-want +got):\n%s", diff)
 	}
 }
 
 func Test_dialStreamLinuxFull(t *testing.T) {
 	const (
-		localFD   uintptr = 10
-		localCID  uint32  = 3
-		localPort uint32  = 1024
+		localCID  uint32 = 3
+		localPort uint32 = 1024
 
 		remoteCID  uint32 = ContextIDHost
 		remotePort uint32 = 2048
@@ -55,11 +52,10 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		Port: remotePort,
 	}
 
-	lfd := &testFD{
+	cfd := &testConnFD{
 		connect: func(sa unix.Sockaddr) error {
-			if want, got := rsa, sa; !reflect.DeepEqual(want, got) {
-				t.Fatalf("unexpected connect sockaddr:\n- want: %#v\n-  got: %#v",
-					want, got)
+			if diff := cmp.Diff(rsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*rsa)); diff != "" {
+				t.Fatalf("unexpected connect sockaddr (-want +got):\n%s", diff)
 			}
 
 			return nil
@@ -67,20 +63,16 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		getsockname: func() (unix.Sockaddr, error) {
 			return lsa, nil
 		},
-		newFile: func(name string) *os.File {
-			return os.NewFile(localFD, name)
-		},
-		setNonblock: func(nonblocking bool) error {
-			if want, got := true, nonblocking; !reflect.DeepEqual(want, got) {
-				t.Fatalf("unexpected set nonblocking value:\n- want: %#v\n-  got: %#v",
-					want, got)
+		setNonblocking: func(name string) error {
+			if diff := cmp.Diff(name, "vsock:vm(3):1024"); diff != "" {
+				t.Fatalf("unexpected non-blocking file name (-want +got):\n%s", diff)
 			}
 
 			return nil
 		},
 	}
 
-	nc, err := dialStreamLinux(lfd, remoteCID, remotePort)
+	nc, err := dialStreamLinux(cfd, remoteCID, remotePort)
 	if err != nil {
 		t.Fatalf("failed to dial: %v", err)
 	}
@@ -92,9 +84,8 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		Port:      localPort,
 	}
 
-	if want, got := localAddr, c.LocalAddr(); !reflect.DeepEqual(want, got) {
-		t.Fatalf("unexpected conn local address:\n- want: %#v\n-  got: %#v",
-			want, got)
+	if diff := cmp.Diff(localAddr, c.LocalAddr()); diff != "" {
+		t.Fatalf("unexpected local address (-want +got):\n%s", diff)
 	}
 
 	remoteAddr := &Addr{
@@ -102,13 +93,7 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		Port:      remotePort,
 	}
 
-	if want, got := remoteAddr, c.RemoteAddr(); !reflect.DeepEqual(want, got) {
-		t.Fatalf("unexpected conn remote address:\n- want: %#v\n-  got: %#v",
-			want, got)
-	}
-
-	if want, got := localFD, c.file.Fd(); want != got {
-		t.Fatalf("unexpected conn file descriptor:\n- want: %d\n-  got: %d",
-			want, got)
+	if diff := cmp.Diff(remoteAddr, c.RemoteAddr()); diff != "" {
+		t.Fatalf("unexpected remote address (-want +got):\n%s", diff)
 	}
 }

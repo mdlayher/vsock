@@ -2,20 +2,16 @@ package vsock
 
 import (
 	"errors"
-	"os"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 )
 
 func Test_listenStreamLinuxHandleError(t *testing.T) {
-	var (
-		closed      bool
-		nonblocking bool
-	)
+	var closed bool
 
-	lfd := &testFD{
+	lfd := &testListenFD{
 		// Track when fd.Close is called.
 		close: func() error {
 			closed = true
@@ -25,24 +21,14 @@ func Test_listenStreamLinuxHandleError(t *testing.T) {
 		bind: func(sa unix.Sockaddr) error {
 			return errors.New("error during bind")
 		},
-		setNonblock: func(n bool) error {
-			nonblocking = n
-			return nil
-		},
 	}
 
 	if _, err := listenStreamLinuxHandleError(lfd, 0, 0); err == nil {
 		t.Fatal("expected an error, but none occurred")
 	}
 
-	if want, got := true, nonblocking; want != got {
-		t.Fatalf("unexpected nonblocking value:\n- want: %v\n-  got: %v",
-			want, got)
-	}
-
-	if want, got := true, closed; want != got {
-		t.Fatalf("unexpected socket close value:\n- want: %v\n-  got: %v",
-			want, got)
+	if diff := cmp.Diff(true, closed); diff != "" {
+		t.Fatalf("unexpected closed value (-want +got):\n%s", diff)
 	}
 }
 
@@ -58,20 +44,17 @@ func Test_listenStreamLinuxPortZero(t *testing.T) {
 		Port: unix.VMADDR_PORT_ANY,
 	}
 
-	bindFn := func(sa unix.Sockaddr) error {
-		if want, got := lsa, sa; !reflect.DeepEqual(want, got) {
-			t.Fatalf("unexpected bind sockaddr:\n- want: %#v\n-  got: %#v",
-				want, got)
-		}
+	lfd := &testListenFD{
+		bind: func(sa unix.Sockaddr) error {
+			if diff := cmp.Diff(lsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*lsa)); diff != "" {
+				t.Fatalf("unexpected bind sockaddr (-want +got):\n%s", diff)
+			}
 
-		return nil
-	}
-
-	lfd := &testFD{
-		bind:        bindFn,
-		listen:      func(n int) error { return nil },
-		getsockname: func() (unix.Sockaddr, error) { return lsa, nil },
-		setNonblock: func(n bool) error { return nil },
+			return nil
+		},
+		listen:         func(n int) error { return nil },
+		getsockname:    func() (unix.Sockaddr, error) { return lsa, nil },
+		setNonblocking: func(_ string) error { return nil },
 	}
 
 	if _, err := listenStreamLinux(lfd, cid, port); err != nil {
@@ -90,19 +73,18 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		Port: port,
 	}
 
-	lfd := &testFD{
+	var nonblocking bool
+	lfd := &testListenFD{
 		bind: func(sa unix.Sockaddr) error {
-			if want, got := lsa, sa; !reflect.DeepEqual(want, got) {
-				t.Fatalf("unexpected bind sockaddr:\n- want: %#v\n-  got: %#v",
-					want, got)
+			if diff := cmp.Diff(lsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*lsa)); diff != "" {
+				t.Fatalf("unexpected bind sockaddr (-want +got):\n%s", diff)
 			}
 
 			return nil
 		},
 		listen: func(n int) error {
-			if want, got := listenBacklog, n; want != got {
-				t.Fatalf("unexpected listen backlog:\n- want: %d\n-  got: %d",
-					want, got)
+			if diff := cmp.Diff(listenBacklog, n); diff != "" {
+				t.Fatalf("unexpected listen backlog (-want +got):\n%s", diff)
 			}
 
 			return nil
@@ -110,12 +92,8 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		getsockname: func() (unix.Sockaddr, error) {
 			return lsa, nil
 		},
-		setNonblock: func(nonblocking bool) error {
-			if want, got := true, nonblocking; !reflect.DeepEqual(want, got) {
-				t.Fatalf("unexpected set nonblocking value:\n- want: %#v\n-  got: %#v",
-					want, got)
-			}
-
+		setNonblocking: func(_ string) error {
+			nonblocking = true
 			return nil
 		},
 	}
@@ -127,39 +105,35 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 
 	l := nl.(*listener)
 
-	if want, got := cid, l.addr.ContextID; want != got {
-		t.Fatalf("unexpected listener context ID:\n- want: %d\n-  got: %d",
-			want, got)
+	want := &Addr{
+		ContextID: cid,
+		Port:      port,
 	}
-	if want, got := port, l.addr.Port; want != got {
-		t.Fatalf("unexpected listener context ID:\n- want: %d\n-  got: %d",
-			want, got)
+
+	if diff := cmp.Diff(true, nonblocking); diff != "" {
+		t.Fatalf("unexpected non-blocking value (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff(want, l.Addr()); diff != "" {
+		t.Fatalf("unexpected local address (-want +got):\n%s", diff)
 	}
 }
 
 func Test_listenerAccept(t *testing.T) {
 	const (
-		connFD uintptr = 10
-
 		cid  uint32 = 3
 		port uint32 = 1024
 	)
 
-	accept4Fn := func(flags int) (fd, unix.Sockaddr, error) {
-		if want, got := 0, flags; want != got {
-			t.Fatalf("unexpected accept4 flags:\n- want: %d\n-  got: %d",
-				want, got)
+	var nonblocking bool
+	accept4Fn := func(flags int) (connFD, unix.Sockaddr, error) {
+		if diff := cmp.Diff(0, flags); diff != "" {
+			t.Fatalf("unexpected accept4 flags (-want +got):\n%s", diff)
 		}
 
-		acceptFD := &testFD{
-			newFile: func(name string) *os.File {
-				return os.NewFile(connFD, name)
-			},
-			setNonblock: func(nonblocking bool) error {
-				if want, got := true, nonblocking; !reflect.DeepEqual(want, got) {
-					t.Fatalf("unexpected set nonblocking value:\n- want: %#v\n-  got: %#v",
-						want, got)
-				}
+		acceptFD := &testConnFD{
+			setNonblocking: func(_ string) error {
+				nonblocking = true
 				return nil
 			},
 		}
@@ -178,7 +152,7 @@ func Test_listenerAccept(t *testing.T) {
 	}
 
 	l := &listener{
-		fd: &testFD{
+		fd: &testListenFD{
 			accept4: accept4Fn,
 		},
 		addr: localAddr,
@@ -191,9 +165,12 @@ func Test_listenerAccept(t *testing.T) {
 
 	c := nc.(*conn)
 
-	if want, got := localAddr, c.LocalAddr(); !reflect.DeepEqual(want, got) {
-		t.Fatalf("unexpected conn local address:\n- want: %#v\n-  got: %#v",
-			want, got)
+	if !nonblocking {
+		t.Fatal("file descriptor was not set to non-blocking mode")
+	}
+
+	if diff := cmp.Diff(localAddr, c.LocalAddr()); diff != "" {
+		t.Fatalf("unexpected local address (-want +got):\n%s", diff)
 	}
 
 	remoteAddr := &Addr{
@@ -201,13 +178,7 @@ func Test_listenerAccept(t *testing.T) {
 		Port:      port,
 	}
 
-	if want, got := remoteAddr, c.RemoteAddr(); !reflect.DeepEqual(want, got) {
-		t.Fatalf("unexpected conn remote address:\n- want: %#v\n-  got: %#v",
-			want, got)
-	}
-
-	if want, got := connFD, c.file.Fd(); want != got {
-		t.Fatalf("unexpected conn file descriptor:\n- want: %d\n-  got: %d",
-			want, got)
+	if diff := cmp.Diff(remoteAddr, c.RemoteAddr()); diff != "" {
+		t.Fatalf("unexpected remote address (-want +got):\n%s", diff)
 	}
 }
