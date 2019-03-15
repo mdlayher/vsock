@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/mdlayher/vsock"
 )
@@ -24,6 +25,8 @@ func main() {
 
 		flagContextID = flag.Uint("c", 0, "send only: context ID of the remote VM socket")
 		flagPort      = flag.Uint("p", 0, "- receive: port ID to listen on (random port by default)\n\t- send: port ID to connect to")
+
+		flagTimeout = flag.Duration("t", 0, "receive only: timeout for read operations (default: no timeout)")
 	)
 
 	flag.Parse()
@@ -43,7 +46,7 @@ func main() {
 			log.Fatalf(`vscp: context ID flag "-c" not valid for receive operation`)
 		}
 
-		receive(target, uint32(*flagPort))
+		receive(target, uint32(*flagPort), *flagTimeout)
 	case *flagSend:
 		send(target, uint32(*flagContextID), uint32(*flagPort))
 	default:
@@ -54,7 +57,7 @@ func main() {
 // receive starts a server and receives data from a remote client using
 // VM sockets.  The data is written to target, which may be a file,
 // or stdout, if no file is specified.
-func receive(target string, port uint32) {
+func receive(target string, port uint32, timeout time.Duration) {
 	// Log helper functions.
 	logf := func(format string, a ...interface{}) {
 		logf("receive: "+format, a...)
@@ -88,6 +91,14 @@ func receive(target string, port uint32) {
 	}
 	defer l.Close()
 
+	// If a timeout is set, set up a timer to close the listener and unblock
+	// the call to Accept once the timeout passes.
+	timeoutCancel := func() {}
+	if timeout != 0 {
+		timer := time.AfterFunc(timeout, func() { _ = l.Close() })
+		timeoutCancel = func() { timer.Stop() }
+	}
+
 	// Show server's address for setting up client flags.
 	log.Printf("receive: listening: %s", l.Addr())
 
@@ -96,7 +107,16 @@ func receive(target string, port uint32) {
 	if err != nil {
 		fatalf("failed to accept: %v", err)
 	}
+
+	// Got a connection, no need to cancel the listener.
+	timeoutCancel()
 	defer c.Close()
+
+	if timeout != 0 {
+		if err := c.SetDeadline(time.Now().Add(timeout)); err != nil {
+			fatalf("failed to set timeout: %v", err)
+		}
+	}
 
 	logf("server: %s", c.LocalAddr())
 	logf("client: %s", c.RemoteAddr())
