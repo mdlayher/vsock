@@ -44,18 +44,17 @@ func Test_listenStreamLinuxPortZero(t *testing.T) {
 		Port: unix.VMADDR_PORT_ANY,
 	}
 
-	bindFn := func(sa unix.Sockaddr) error {
-		if diff := cmp.Diff(lsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*lsa)); diff != "" {
-			t.Fatalf("unexpected bind sockaddr (-want +got):\n%s", diff)
-		}
-
-		return nil
-	}
-
 	lfd := &testListenFD{
-		bind:        bindFn,
-		listen:      func(n int) error { return nil },
-		getsockname: func() (unix.Sockaddr, error) { return lsa, nil },
+		bind: func(sa unix.Sockaddr) error {
+			if diff := cmp.Diff(lsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*lsa)); diff != "" {
+				t.Fatalf("unexpected bind sockaddr (-want +got):\n%s", diff)
+			}
+
+			return nil
+		},
+		listen:         func(n int) error { return nil },
+		getsockname:    func() (unix.Sockaddr, error) { return lsa, nil },
+		setNonblocking: func(_ string) error { return nil },
 	}
 
 	if _, err := listenStreamLinux(lfd, cid, port); err != nil {
@@ -74,6 +73,7 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		Port: port,
 	}
 
+	var nonblocking bool
 	lfd := &testListenFD{
 		bind: func(sa unix.Sockaddr) error {
 			if diff := cmp.Diff(lsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*lsa)); diff != "" {
@@ -92,6 +92,10 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		getsockname: func() (unix.Sockaddr, error) {
 			return lsa, nil
 		},
+		setNonblocking: func(_ string) error {
+			nonblocking = true
+			return nil
+		},
 	}
 
 	nl, err := listenStreamLinux(lfd, cid, port)
@@ -104,6 +108,10 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 	want := &Addr{
 		ContextID: cid,
 		Port:      port,
+	}
+
+	if diff := cmp.Diff(true, nonblocking); diff != "" {
+		t.Fatalf("unexpected non-blocking value (-want +got):\n%s", diff)
 	}
 
 	if diff := cmp.Diff(want, l.Addr()); diff != "" {

@@ -60,7 +60,7 @@ func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (net.Listener,
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
 		// to avoid file descriptor leaks.
-		_ = lfd.Close()
+		_ = lfd.EarlyClose()
 		return nil, err
 	}
 
@@ -92,6 +92,16 @@ func listenStreamLinux(lfd listenFD, cid, port uint32) (net.Listener, error) {
 
 	lsa, err := lfd.Getsockname()
 	if err != nil {
+		return nil, err
+	}
+
+	// Done with blocking mode setup, transition to non-blocking before the
+	// caller has a chance to start calling things concurrently that might make
+	// the locking situation tricky.
+	//
+	// Note: if any calls fail after this point, lfd.Close should be invoked
+	// for cleanup because the socket is now non-blocking.
+	if err := lfd.SetNonblocking("vsock-listen"); err != nil {
 		return nil, err
 	}
 

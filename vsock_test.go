@@ -65,7 +65,6 @@ func TestUnblockAcceptAfterClose(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-
 	wg.Add(1)
 
 	go func() {
@@ -80,13 +79,17 @@ func TestUnblockAcceptAfterClose(t *testing.T) {
 		}
 	}()
 
+	time.AfterFunc(10*time.Second, func() {
+		panic("took too long waiting for listener to close")
+	})
+
 	time.Sleep(100 * time.Millisecond)
 
 	if err := listener.Close(); err != nil {
 		t.Fatalf("failed to close listener: %v", err)
 	}
 
-	done := make(chan bool)
+	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
@@ -95,7 +98,6 @@ func TestUnblockAcceptAfterClose(t *testing.T) {
 	select {
 	case <-done:
 		t.Log("done")
-		return
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting accept to unblock")
 	}

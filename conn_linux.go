@@ -31,6 +31,8 @@ func (c *conn) Close() error                       { return c.fd.Close() }
 // newConn creates a conn using an connFD, immediately setting the connFD to
 // non-blocking mode for use with the runtime network poller.
 func newConn(cfd connFD, local, remote *Addr) (*conn, error) {
+	// Note: if any calls fail after this point, cfd.Close should be invoked
+	// for cleanup because the socket is now non-blocking.
 	if err := cfd.SetNonblocking(local.fileName()); err != nil {
 		return nil, err
 	}
@@ -58,8 +60,8 @@ func dialStreamLinuxHandleError(cfd connFD, cid, port uint32) (net.Conn, error) 
 	c, err := dialStreamLinux(cfd, cid, port)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
-		// to avoid file descriptor leaks.
-		_ = cfd.Close()
+		// early to avoid file descriptor leaks.
+		_ = cfd.EarlyClose()
 		return nil, err
 	}
 
