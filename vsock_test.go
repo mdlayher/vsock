@@ -1,11 +1,11 @@
 package vsock
 
 import (
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 func TestAddr_fileName(t *testing.T) {
@@ -54,6 +54,13 @@ func TestAddr_fileName(t *testing.T) {
 func TestUnblockAcceptAfterClose(t *testing.T) {
 	listener, err := Listen(1024)
 	if err != nil {
+		if os.IsNotExist(err) {
+			t.Skipf("skipping, vsock device does not exist: %v", err)
+		}
+		if os.IsPermission(err) {
+			t.Skipf("skipping, permission denied: %v", err)
+		}
+
 		t.Fatalf("failed to run listener: %v", err)
 	}
 
@@ -68,10 +75,8 @@ func TestUnblockAcceptAfterClose(t *testing.T) {
 		_, err := listener.Accept()
 		t.Log("after accept")
 
-		if err == nil {
-			t.Error("accept should return an error, got nil")
-		} else if err != unix.EWOULDBLOCK {
-			t.Errorf("unexpected error '%v' != '%v'", err, unix.EWOULDBLOCK)
+		if !strings.Contains(err.Error(), "use of closed file") {
+			t.Errorf("unexpected accept error: %v", err)
 		}
 	}()
 

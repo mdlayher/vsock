@@ -3,31 +3,47 @@
 package vsock
 
 import (
-	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
 
-var _ fd = &testFD{}
+var _ listenFD = &testListenFD{}
 
-// A testFD is the test implementation of fd, with functions that can be set
-// for each of its methods.
-type testFD struct {
-	accept4     func(flags int) (fd, unix.Sockaddr, error)
+type testListenFD struct {
+	accept4     func(flags int) (connFD, unix.Sockaddr, error)
 	bind        func(sa unix.Sockaddr) error
 	close       func() error
-	connect     func(sa unix.Sockaddr) error
 	listen      func(n int) error
-	newFile     func(name string) *os.File
 	getsockname func() (unix.Sockaddr, error)
-	setNonblock func(nonblocking bool) error
 }
 
-func (fd *testFD) Accept4(flags int) (fd, unix.Sockaddr, error) { return fd.accept4(flags) }
-func (fd *testFD) Bind(sa unix.Sockaddr) error                  { return fd.bind(sa) }
-func (fd *testFD) Close() error                                 { return fd.close() }
-func (fd *testFD) Connect(sa unix.Sockaddr) error               { return fd.connect(sa) }
-func (fd *testFD) Getsockname() (unix.Sockaddr, error)          { return fd.getsockname() }
-func (fd *testFD) Listen(n int) error                           { return fd.listen(n) }
-func (fd *testFD) NewFile(name string) *os.File                 { return fd.newFile(name) }
-func (fd *testFD) SetNonblock(nonblocking bool) error           { return fd.setNonblock(nonblocking) }
+func (lfd *testListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) { return lfd.accept4(flags) }
+func (lfd *testListenFD) Bind(sa unix.Sockaddr) error                      { return lfd.bind(sa) }
+func (lfd *testListenFD) Close() error                                     { return lfd.close() }
+func (lfd *testListenFD) Getsockname() (unix.Sockaddr, error)              { return lfd.getsockname() }
+func (lfd *testListenFD) Listen(n int) error                               { return lfd.listen(n) }
+
+var _ connFD = &testConnFD{}
+
+type testConnFD struct {
+	read             func(b []byte) (int, error)
+	write            func(b []byte) (int, error)
+	close            func() error
+	connect          func(sa unix.Sockaddr) error
+	getsockname      func() (unix.Sockaddr, error)
+	setNonblocking   func(name string) error
+	setDeadline      func(t time.Time) error
+	setReadDeadline  func(t time.Time) error
+	setWriteDeadline func(t time.Time) error
+}
+
+func (cfd *testConnFD) Read(b []byte) (int, error)          { return cfd.read(b) }
+func (cfd *testConnFD) Write(b []byte) (int, error)         { return cfd.write(b) }
+func (cfd *testConnFD) Close() error                        { return cfd.close() }
+func (cfd *testConnFD) Connect(sa unix.Sockaddr) error      { return cfd.connect(sa) }
+func (cfd *testConnFD) Getsockname() (unix.Sockaddr, error) { return cfd.getsockname() }
+func (cfd *testConnFD) SetNonblocking(name string) error    { return cfd.setNonblocking(name) }
+func (cfd *testConnFD) SetDeadline(t time.Time) error       { return cfd.setDeadline(t) }
+func (cfd *testConnFD) SetReadDeadline(t time.Time) error   { return cfd.setReadDeadline(t) }
+func (cfd *testConnFD) SetWriteDeadline(t time.Time) error  { return cfd.setWriteDeadline(t) }
