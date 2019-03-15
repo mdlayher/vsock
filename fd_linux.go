@@ -9,6 +9,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// A listenFD is a type that wraps a file descriptor used to implement
+// net.Listener.
 type listenFD interface {
 	io.Closer
 	Accept4(flags int) (connFD, unix.Sockaddr, error)
@@ -17,43 +19,76 @@ type listenFD interface {
 	Getsockname() (unix.Sockaddr, error)
 }
 
+var _ listenFD = &sysListenFD{}
+
+// A sysListenFD is the system call implementation of listenFD.
 type sysListenFD struct {
-	f *os.File
+	// These fields should never be non-zero at the same time.
+	fd int      // Used in blocking mode.
+	f  *os.File // Used in non-blocking mode.
 }
 
+// newListenFD creates a sysListenFD in its default blocking mode.
 func newListenFD() (*sysListenFD, error) {
 	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := unix.SetNonblock(fd, true); err != nil {
-		return nil, err
-	}
-
 	return &sysListenFD{
-		f: os.NewFile(uintptr(fd), "vsock-listen"),
+		fd: fd,
 	}, nil
 }
 
+// Blocking mode methods.
+
+func (lfd *sysListenFD) Bind(sa unix.Sockaddr) error {
+	lfd.check()
+	return unix.Bind(lfd.fd, sa)
+}
+
+func (lfd *sysListenFD) Getsockname() (unix.Sockaddr, error) {
+	lfd.check()
+	return unix.Getsockname(lfd.fd)
+}
+
+func (lfd *sysListenFD) Listen(n int) error {
+	lfd.check()
+	return unix.Listen(lfd.fd, n)
+}
+
+// Non-blocking mode methods.
+
 func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
+	// From now on, we must perform non-blocking I/O, so that our
+	// net.Listener.Accept method can be interrupted by closing the socket.
+	if err := unix.SetNonblock(lfd.fd, true); err != nil {
+		return nil, nil, err
+	}
+
+	// Transition from blocking mode to non-blocking mode, and ensure invariants
+	// are not violated.
+	lfd.f = os.NewFile(uintptr(lfd.fd), "vsock-listen")
+	lfd.fd = 0
+	lfd.check()
+
+	rc, err := lfd.f.SyscallConn()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	var (
 		nfd int
 		sa  unix.Sockaddr
-		err error
 	)
 
-	doErr := fdread(lfd.f, func(fd int) bool {
-		// Returns a regular file descriptor, must be wrapped in another
-		// sysConnFD for it to work properly.
-		nfd, sa, err = unix.Accept4(fd, flags)
+	doErr := rc.Read(func(fd uintptr) bool {
+		nfd, sa, err = unix.Accept4(int(fd), flags)
 
 		// When the socket is in non-blocking mode, we might see
 		// EAGAIN and end up here. In that case, return false to
 		// let the poller wait for readiness. See the source code
 		// for internal/poll.FD.RawRead for more details.
-		//
-		// If the socket is in blocking mode, EAGAIN should never occur.
 		return err != syscall.EAGAIN
 	})
 	if doErr != nil {
@@ -63,6 +98,7 @@ func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
 		return nil, nil, err
 	}
 
+	// Create a non-blocking connFD which will be used to implement net.Conn.
 	cfd, err := newConnFD(nfd)
 	if err != nil {
 		return nil, nil, err
@@ -71,19 +107,9 @@ func (lfd *sysListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) {
 	return cfd, sa, nil
 }
 
-func (lfd *sysListenFD) Bind(sa unix.Sockaddr) error {
-	var err error
-	doErr := fdcontrol(lfd.f, func(fd int) {
-		err = unix.Bind(fd, sa)
-	})
-	if doErr != nil {
-		return doErr
-	}
-
-	return err
-}
-
 func (lfd *sysListenFD) Close() error {
+	lfd.check()
+
 	var err error
 	doErr := fdcontrol(lfd.f, func(fd int) {
 		err = unix.Close(fd)
@@ -92,36 +118,17 @@ func (lfd *sysListenFD) Close() error {
 		return doErr
 	}
 
+	// We must also close the runtime network poller file descriptor for
+	// net.Listener.Accept to stop blocking.
 	_ = lfd.f.Close()
 	return err
 }
 
-func (lfd *sysListenFD) Getsockname() (unix.Sockaddr, error) {
-	var (
-		sa  unix.Sockaddr
-		err error
-	)
-
-	doErr := fdcontrol(lfd.f, func(fd int) {
-		sa, err = unix.Getsockname(fd)
-	})
-	if doErr != nil {
-		return nil, doErr
+func (lfd *sysListenFD) check() {
+	// Verify that both file descriptor states cannot exist at the same time.
+	if lfd.fd != 0 && lfd.f != nil {
+		panic("vsock: sysListenFD blocking to non-blocking mode transition invariant violation, please file a bug: https://github.com/mdlayher/vsock")
 	}
-
-	return sa, err
-}
-
-func (lfd *sysListenFD) Listen(n int) error {
-	var err error
-	doErr := fdcontrol(lfd.f, func(fd int) {
-		err = unix.Listen(fd, n)
-	})
-	if doErr != nil {
-		return doErr
-	}
-
-	return err
 }
 
 // A fd is an interface for a file descriptor, used to perform system
@@ -201,16 +208,6 @@ func (cfd *sysConnFD) Write(b []byte) (int, error)        { return cfd.f.Write(b
 func (cfd *sysConnFD) SetDeadline(t time.Time) error      { return cfd.f.SetDeadline(t) }
 func (cfd *sysConnFD) SetReadDeadline(t time.Time) error  { return cfd.f.SetReadDeadline(t) }
 func (cfd *sysConnFD) SetWriteDeadline(t time.Time) error { return cfd.f.SetWriteDeadline(t) }
-
-func fdread(fd *os.File, f func(int) bool) error {
-	rc, err := fd.SyscallConn()
-	if err != nil {
-		return err
-	}
-	return rc.Read(func(sysConnFD uintptr) bool {
-		return f(int(sysConnFD))
-	})
-}
 
 func fdcontrol(fd *os.File, f func(int)) error {
 	rc, err := fd.SyscallConn()
