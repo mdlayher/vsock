@@ -1,14 +1,7 @@
 package vsock
 
 import (
-	"net"
-	"os"
-	"strings"
-	"sync"
 	"testing"
-	"time"
-
-	"github.com/mdlayher/vsock/internal/vsutil"
 )
 
 func TestAddr_fileName(t *testing.T) {
@@ -51,69 +44,5 @@ func TestAddr_fileName(t *testing.T) {
 					want, got)
 			}
 		})
-	}
-}
-
-func TestUnblockAcceptAfterClose(t *testing.T) {
-	listener, err := Listen(1024)
-	if err != nil {
-		if os.IsNotExist(err) {
-			t.Skipf("skipping, vsock device does not exist: %v", err)
-		}
-		if os.IsPermission(err) {
-			t.Skipf("skipping, permission denied: %v", err)
-		}
-
-		t.Fatalf("failed to run listener: %v", err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		t.Log("start accept")
-		_, err := vsutil.Accept(listener, 10*time.Second)
-		t.Log("after accept")
-
-		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-			t.Errorf("expected permanent error, but got temporary one: %v", err)
-		}
-
-		// Go1.11:
-		if strings.Contains(err.Error(), "bad file descriptor") {
-			// All is well, the file descriptor was closed.
-			return
-		}
-
-		// Go 1.12+:
-		// TODO(mdlayher): wrap string error in net.OpError or similar.
-		if !strings.Contains(err.Error(), "use of closed file") {
-			t.Errorf("unexpected accept error: %v", err)
-		}
-	}()
-
-	time.AfterFunc(10*time.Second, func() {
-		panic("took too long waiting for listener to close")
-	})
-
-	time.Sleep(100 * time.Millisecond)
-
-	if err := listener.Close(); err != nil {
-		t.Fatalf("failed to close listener: %v", err)
-	}
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		t.Log("done")
-	case <-time.After(5 * time.Second):
-		t.Fatal("timeout waiting accept to unblock")
 	}
 }

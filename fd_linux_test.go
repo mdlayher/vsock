@@ -17,6 +17,7 @@ type testListenFD struct {
 	listen         func(n int) error
 	getsockname    func() (unix.Sockaddr, error)
 	setNonblocking func(name string) error
+	setDeadline    func(t time.Time) error
 }
 
 func (lfd *testListenFD) Accept4(flags int) (connFD, unix.Sockaddr, error) { return lfd.accept4(flags) }
@@ -29,6 +30,7 @@ func (lfd *testListenFD) EarlyClose() error {
 func (lfd *testListenFD) Getsockname() (unix.Sockaddr, error) { return lfd.getsockname() }
 func (lfd *testListenFD) Listen(n int) error                  { return lfd.listen(n) }
 func (lfd *testListenFD) SetNonblocking(name string) error    { return lfd.setNonblocking(name) }
+func (lfd *testListenFD) SetDeadline(t time.Time) error       { return lfd.setDeadline(t) }
 
 var _ connFD = &testConnFD{}
 
