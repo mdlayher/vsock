@@ -110,6 +110,7 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 	if err != nil {
 		fatalf("failed to accept: %v", err)
 	}
+	_ = l.Close()
 	defer c.Close()
 
 	if timeout != 0 {

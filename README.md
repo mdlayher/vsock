@@ -14,17 +14,20 @@ by this package are backed by non-blocking I/O, in order to integrate with Go's
 runtime network poller in newer versions of Go.
 
 - **Go 1.12.x+ (recommended):**
-  - `net.Listener`:
+  - `vsock.Listener`:
     - `Accept` blocks until a connection is received
     - `Close` can interrupt `Accept` and make it return a permanent error
+    - `SetDeadline` can set timeouts which can interrupt `Accept` and make it
+    return a temporary error
   - `net.Conn`: full timeout support via `SetDeadline` family of methods
 - Go 1.11.x **(not recommended)**:
-  - `net.Listener`:
+  - `vsock.Listener`:
     - `Accept` is **non-blocking** and should be called in a loop, checking for
       `net.Error.Temporary() == true` and sleeping for a short period to avoid
       wasteful, spinning CPU cycles
     - `Close` makes `Accept` return a permanent error on the next
       loop iteration
+    - `SetDeadline` **is not supported** and will always return an error
   - `net.Conn`: full timeout support via `SetDeadline` family of methods
 - Go 1.10.x or below: **not supported**
 

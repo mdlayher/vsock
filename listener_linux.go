@@ -4,6 +4,7 @@ package vsock
 
 import (
 	"net"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -18,8 +19,9 @@ type listener struct {
 }
 
 // Addr and Close implement the net.Listener interface for listener.
-func (l *listener) Addr() net.Addr { return l.addr }
-func (l *listener) Close() error   { return l.fd.Close() }
+func (l *listener) Addr() net.Addr                { return l.addr }
+func (l *listener) Close() error                  { return l.fd.Close() }
+func (l *listener) SetDeadline(t time.Time) error { return l.fd.SetDeadline(t) }
 
 // Accept accepts a single connection from the listener, and sets up
 // a net.Conn backed by conn.
@@ -39,7 +41,7 @@ func (l *listener) Accept() (net.Conn, error) {
 }
 
 // listenStream is the entry point for ListenStream on Linux.
-func listenStream(port uint32) (net.Listener, error) {
+func listenStream(port uint32) (*listener, error) {
 	var cid uint32
 	if err := localContextID(sysFS{}, &cid); err != nil {
 		return nil, err
@@ -55,7 +57,7 @@ func listenStream(port uint32) (net.Listener, error) {
 
 // listenStreamLinuxHandleError ensures that any errors from listenStreamLinux
 // result in the socket being cleaned up properly.
-func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (net.Listener, error) {
+func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (*listener, error) {
 	l, err := listenStreamLinux(lfd, cid, port)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
@@ -71,7 +73,7 @@ func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (net.Listener,
 const listenBacklog = 32
 
 // listenStreamLinux is the entry point for tests on Linux.
-func listenStreamLinux(lfd listenFD, cid, port uint32) (net.Listener, error) {
+func listenStreamLinux(lfd listenFD, cid, port uint32) (*listener, error) {
 	// Zero-value for "any port" is friendlier in Go than a constant.
 	if port == 0 {
 		port = unix.VMADDR_PORT_ANY

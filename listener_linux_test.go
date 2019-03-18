@@ -98,12 +98,10 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		},
 	}
 
-	nl, err := listenStreamLinux(lfd, cid, port)
+	l, err := listenStreamLinux(lfd, cid, port)
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
-
-	l := nl.(*listener)
 
 	want := &Addr{
 		ContextID: cid,

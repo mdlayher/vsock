@@ -2,7 +2,11 @@
 
 package vsock
 
-import "golang.org/x/sys/unix"
+import (
+	"time"
+
+	"golang.org/x/sys/unix"
+)
 
 func (lfd *sysListenFD) accept4(flags int) (int, unix.Sockaddr, error) {
 	// In Go 1.12+, we make use of runtime network poller integration to allow
@@ -44,3 +48,5 @@ func (lfd *sysListenFD) accept4(flags int) (int, unix.Sockaddr, error) {
 
 	return newFD, sa, err
 }
+
+func (lfd *sysListenFD) setDeadline(t time.Time) error { return lfd.f.SetDeadline(t) }

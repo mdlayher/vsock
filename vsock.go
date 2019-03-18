@@ -5,6 +5,7 @@ package vsock
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
 const (
@@ -22,17 +23,45 @@ const (
 )
 
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
-// connections.  The port parameter specifies the port for the listener.
+// connections. The port parameter specifies the port for the Listener.
 //
 // To allow the server to assign a port automatically, specify 0 for port.
 // The address of the server can be retrieved using the Addr method.
 //
-// The Accept method is used to accept incoming connections.
-//
-// When the listener is no longer needed, Close must be called to free resources.
-func Listen(port uint32) (net.Listener, error) {
-	return listenStream(port)
+// When the Listener is no longer needed, Close must be called to free resources.
+func Listen(port uint32) (*Listener, error) {
+	l, err := listenStream(port)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Listener{l: l}, nil
 }
+
+var _ net.Listener = &Listener{}
+
+// A Listener is a VM sockets implementation of a net.Listener.
+type Listener struct {
+	l *listener
+}
+
+// Accept implements the Accept method in the net.Listener interface; it waits
+// for the next call and returns a generic net.Conn.
+func (l *Listener) Accept() (net.Conn, error) { return l.l.Accept() }
+
+// Addr returns the listener's network address, a *Addr. The Addr returned is
+// shared by all invocations of Addr, so do not modify it.
+func (l *Listener) Addr() net.Addr { return l.l.Addr() }
+
+// Close stops listening on the VM sockets address. Already Accepted connections
+// are not closed.
+func (l *Listener) Close() error { return l.l.Close() }
+
+// SetDeadline sets the deadline associated with the listener. A zero time value
+// disables the deadline.
+//
+// SetDeadline only works with Go 1.12+.
+func (l *Listener) SetDeadline(t time.Time) error { return l.l.SetDeadline(t) }
 
 // Dial dials a connection-oriented net.Conn to a VM sockets server.
 // The contextID and port parameters specify the address of the server.

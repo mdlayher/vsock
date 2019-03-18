@@ -18,6 +18,7 @@ type listenFD interface {
 	Listen(n int) error
 	Getsockname() (unix.Sockaddr, error)
 	SetNonblocking(name string) error
+	SetDeadline(t time.Time) error
 }
 
 var _ listenFD = &sysListenFD{}
@@ -82,6 +83,11 @@ func (lfd *sysListenFD) Close() error {
 	// In Go 1.12+, *os.File.Close will also close the runtime network poller
 	// file descriptor, so that net.Listener.Accept can stop blocking.
 	return lfd.f.Close()
+}
+
+func (lfd *sysListenFD) SetDeadline(t time.Time) error {
+	// Invoke Go version-specific logic for setDeadline.
+	return lfd.setDeadline(t)
 }
 
 // A connFD is a type that wraps a file descriptor used to implement net.Conn.
