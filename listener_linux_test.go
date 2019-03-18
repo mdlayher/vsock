@@ -34,7 +34,7 @@ func Test_listenStreamLinuxHandleError(t *testing.T) {
 
 func Test_listenStreamLinuxPortZero(t *testing.T) {
 	const (
-		cid  uint32 = ContextIDHost
+		cid  uint32 = Host
 		port uint32 = 0
 	)
 
@@ -64,7 +64,7 @@ func Test_listenStreamLinuxPortZero(t *testing.T) {
 
 func Test_listenStreamLinuxFull(t *testing.T) {
 	const (
-		cid  uint32 = ContextIDHost
+		cid  uint32 = Host
 		port uint32 = 1024
 	)
 
@@ -145,7 +145,7 @@ func Test_listenerAccept(t *testing.T) {
 	}
 
 	localAddr := &Addr{
-		ContextID: ContextIDHost,
+		ContextID: Host,
 		Port:      port,
 	}
 

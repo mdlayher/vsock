@@ -92,7 +92,7 @@ func Test_localContextIDHostIntegration(t *testing.T) {
 		t.Fatalf("failed to retrieve host's context ID: %v", err)
 	}
 
-	if want, got := ContextIDHost, cid; want != got {
+	if want, got := uint32(Host), cid; want != got {
 		t.Fatalf("unexpected host context ID:\n- want: %d\n-  got: %d",
 			want, got)
 	}
@@ -116,9 +116,9 @@ func isHypervisor(t *testing.T) bool {
 	}
 
 	switch cid {
-	case ContextIDHost:
+	case Host:
 		return true
-	case ContextIDHypervisor, ContextIDReserved:
+	case Hypervisor, cidReserved:
 		t.Fatalf("context ID %d is reserved, failing", cid)
 	}
 

@@ -11,17 +11,17 @@ func TestAddr_fileName(t *testing.T) {
 		s    string
 	}{
 		{
-			cid:  ContextIDHypervisor,
+			cid:  Hypervisor,
 			port: 10,
 			s:    "vsock:hypervisor(0):10",
 		},
 		{
-			cid:  ContextIDReserved,
+			cid:  cidReserved,
 			port: 20,
 			s:    "vsock:reserved(1):20",
 		},
 		{
-			cid:  ContextIDHost,
+			cid:  Host,
 			port: 30,
 			s:    "vsock:host(2):30",
 		},

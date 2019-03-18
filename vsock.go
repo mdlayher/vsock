@@ -9,17 +9,17 @@ import (
 )
 
 const (
-	// ContextIDHypervisor specifies that a socket should communicate with
-	// the hypervisor process.
-	ContextIDHypervisor uint32 = 0x0
+	// Hypervisor specifies that a socket should communicate with the hypervisor
+	// process.
+	Hypervisor = 0x0
 
-	// ContextIDReserved is a reserved context ID that is no longer in use,
+	// Host specifies that a socket should communicate with processes other than
+	// the hypervisor on the host machine.
+	Host = 0x2
+
+	// cidReserved is a reserved context ID that is no longer in use,
 	// and cannot be used for socket communications.
-	ContextIDReserved uint32 = 0x1
-
-	// ContextIDHost specifies that a socket should communicate with other
-	// processes than the hypervisor on the host machine.
-	ContextIDHost uint32 = 0x2
+	cidReserved = 0x1
 )
 
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
@@ -69,9 +69,9 @@ func (l *Listener) SetDeadline(t time.Time) error { return l.l.SetDeadline(t) }
 // If dialing a connection from the hypervisor to a virtual machine, the VM's
 // context ID should be specified.
 //
-// If dialing from a VM to the hypervisor, ContextIDHypervisor should be used
-// to talk to the hypervisor process, or ContextIDHost should be used to talk
-// to other processes on the host machine.
+// If dialing from a VM to the hypervisor, Hypervisor should be used to
+// communicate with the hypervisor process, or Host should be used to
+// communicate with other processes on the host machine.
 //
 // When the connection is no longer needed, Close must be called to free resources.
 func Dial(contextID, port uint32) (net.Conn, error) {
@@ -97,11 +97,11 @@ func (a *Addr) String() string {
 	var host string
 
 	switch a.ContextID {
-	case ContextIDHypervisor:
+	case Hypervisor:
 		host = fmt.Sprintf("hypervisor(%d)", a.ContextID)
-	case ContextIDReserved:
+	case cidReserved:
 		host = fmt.Sprintf("reserved(%d)", a.ContextID)
-	case ContextIDHost:
+	case Host:
 		host = fmt.Sprintf("host(%d)", a.ContextID)
 	default:
 		host = fmt.Sprintf("vm(%d)", a.ContextID)

@@ -38,7 +38,7 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		localCID  uint32 = 3
 		localPort uint32 = 1024
 
-		remoteCID  uint32 = ContextIDHost
+		remoteCID  uint32 = Host
 		remotePort uint32 = 2048
 	)
 
