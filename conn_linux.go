@@ -28,24 +28,26 @@ func (c *conn) Read(b []byte) (n int, err error)   { return c.fd.Read(b) }
 func (c *conn) Write(b []byte) (n int, err error)  { return c.fd.Write(b) }
 func (c *conn) Close() error                       { return c.fd.Close() }
 
-// newConn creates a conn using an connFD, immediately setting the connFD to
+// newConn creates a Conn using a connFD, immediately setting the connFD to
 // non-blocking mode for use with the runtime network poller.
-func newConn(cfd connFD, local, remote *Addr) (*conn, error) {
+func newConn(cfd connFD, local, remote *Addr) (*Conn, error) {
 	// Note: if any calls fail after this point, cfd.Close should be invoked
 	// for cleanup because the socket is now non-blocking.
 	if err := cfd.SetNonblocking(local.fileName()); err != nil {
 		return nil, err
 	}
 
-	return &conn{
-		fd:         cfd,
-		localAddr:  local,
-		remoteAddr: remote,
+	return &Conn{
+		c: &conn{
+			fd:         cfd,
+			localAddr:  local,
+			remoteAddr: remote,
+		},
 	}, nil
 }
 
-// dialStream is the entry point for DialStream on Linux.
-func dialStream(cid, port uint32) (net.Conn, error) {
+// dialStream is the entry point for Dial on Linux.
+func dialStream(cid, port uint32) (*Conn, error) {
 	cfd, err := newConnFD()
 	if err != nil {
 		return nil, err
@@ -56,7 +58,7 @@ func dialStream(cid, port uint32) (net.Conn, error) {
 
 // dialStreamLinuxHandleError ensures that any errors from dialStreamLinux result
 // in the socket being cleaned up properly.
-func dialStreamLinuxHandleError(cfd connFD, cid, port uint32) (net.Conn, error) {
+func dialStreamLinuxHandleError(cfd connFD, cid, port uint32) (*Conn, error) {
 	c, err := dialStreamLinux(cfd, cid, port)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
@@ -69,7 +71,7 @@ func dialStreamLinuxHandleError(cfd connFD, cid, port uint32) (net.Conn, error) 
 }
 
 // dialStreamLinux is the entry point for tests on Linux.
-func dialStreamLinux(cfd connFD, cid, port uint32) (net.Conn, error) {
+func dialStreamLinux(cfd connFD, cid, port uint32) (*Conn, error) {
 	rsa := &unix.SockaddrVM{
 		CID:  cid,
 		Port: port,

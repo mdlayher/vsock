@@ -30,12 +30,7 @@ const (
 //
 // When the Listener is no longer needed, Close must be called to free resources.
 func Listen(port uint32) (*Listener, error) {
-	l, err := listenStream(port)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Listener{l: l}, nil
+	return listenStream(port)
 }
 
 var _ net.Listener = &Listener{}
@@ -46,7 +41,8 @@ type Listener struct {
 }
 
 // Accept implements the Accept method in the net.Listener interface; it waits
-// for the next call and returns a generic net.Conn.
+// for the next call and returns a generic net.Conn. The returned net.Conn will
+// always be of type *Conn.
 func (l *Listener) Accept() (net.Conn, error) { return l.l.Accept() }
 
 // Addr returns the listener's network address, a *Addr. The Addr returned is
@@ -74,9 +70,42 @@ func (l *Listener) SetDeadline(t time.Time) error { return l.l.SetDeadline(t) }
 // communicate with other processes on the host machine.
 //
 // When the connection is no longer needed, Close must be called to free resources.
-func Dial(contextID, port uint32) (net.Conn, error) {
+func Dial(contextID, port uint32) (*Conn, error) {
 	return dialStream(contextID, port)
 }
+
+var _ net.Conn = &Conn{}
+
+// A Conn is a VM sockets implementation of a net.Conn.
+type Conn struct {
+	c *conn
+}
+
+// Close closes the connection.
+func (c *Conn) Close() error { return c.c.Close() }
+
+// LocalAddr returns the local network address. The Addr returned is shared by
+// all invocations of LocalAddr, so do not modify it.
+func (c *Conn) LocalAddr() net.Addr { return c.c.LocalAddr() }
+
+// RemoteAddr returns the remote network address. The Addr returned is shared by
+// all invocations of RemoteAddr, so do not modify it.
+func (c *Conn) RemoteAddr() net.Addr { return c.c.RemoteAddr() }
+
+// Read implements the net.Conn Read method.
+func (c *Conn) Read(b []byte) (n int, err error) { return c.c.Read(b) }
+
+// Write implements the net.Conn Write method.
+func (c *Conn) Write(b []byte) (n int, err error) { return c.c.Write(b) }
+
+// SetDeadline implements the net.Conn SetDeadline method.
+func (c *Conn) SetDeadline(t time.Time) error { return c.c.SetDeadline(t) }
+
+// SetReadDeadline implements the net.Conn SetReadDeadline method.
+func (c *Conn) SetReadDeadline(t time.Time) error { return c.c.SetReadDeadline(t) }
+
+// SetWriteDeadline implements the net.Conn SetWriteDeadline method.
+func (c *Conn) SetWriteDeadline(t time.Time) error { return c.c.SetWriteDeadline(t) }
 
 // TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 

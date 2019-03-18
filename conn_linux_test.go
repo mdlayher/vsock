@@ -72,12 +72,10 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		},
 	}
 
-	nc, err := dialStreamLinux(cfd, remoteCID, remotePort)
+	c, err := dialStreamLinux(cfd, remoteCID, remotePort)
 	if err != nil {
 		t.Fatalf("failed to dial: %v", err)
 	}
-
-	c := nc.(*conn)
 
 	localAddr := &Addr{
 		ContextID: localCID,

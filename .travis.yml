@@ -4,13 +4,14 @@ go:
   - 1.11.x
 os:
   - linux
+  - osx
 sudo: required
 before_install:
   - go get golang.org/x/lint/golint
   - go get honnef.co/go/tools/cmd/staticcheck
   - go get -d ./...
-  - sudo modprobe vmw_vsock_vmci_transport
-  - sudo chmod 666 /dev/vsock
+  - if [[ `uname` == "Linux" ]]; then sudo modprobe vmw_vsock_vmci_transport; fi
+  - if [[ `uname` == "Linux" ]]; then sudo chmod 666 /dev/vsock; fi
 script:
   - go build -tags=gofuzz ./...
   - go vet ./...
