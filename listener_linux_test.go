@@ -161,7 +161,8 @@ func Test_listenerAccept(t *testing.T) {
 		t.Fatalf("failed to accept: %v", err)
 	}
 
-	c := nc.(*conn)
+	// Accept must produce *Conn.
+	c := nc.(*Conn)
 
 	if !nonblocking {
 		t.Fatal("file descriptor was not set to non-blocking mode")

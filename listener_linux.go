@@ -41,7 +41,7 @@ func (l *listener) Accept() (net.Conn, error) {
 }
 
 // listenStream is the entry point for ListenStream on Linux.
-func listenStream(port uint32) (*listener, error) {
+func listenStream(port uint32) (*Listener, error) {
 	var cid uint32
 	if err := localContextID(sysFS{}, &cid); err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func listenStream(port uint32) (*listener, error) {
 
 // listenStreamLinuxHandleError ensures that any errors from listenStreamLinux
 // result in the socket being cleaned up properly.
-func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (*listener, error) {
+func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (*Listener, error) {
 	l, err := listenStreamLinux(lfd, cid, port)
 	if err != nil {
 		// If any system calls fail during setup, the socket must be closed
@@ -73,7 +73,7 @@ func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (*listener, er
 const listenBacklog = 32
 
 // listenStreamLinux is the entry point for tests on Linux.
-func listenStreamLinux(lfd listenFD, cid, port uint32) (*listener, error) {
+func listenStreamLinux(lfd listenFD, cid, port uint32) (*Listener, error) {
 	// Zero-value for "any port" is friendlier in Go than a constant.
 	if port == 0 {
 		port = unix.VMADDR_PORT_ANY
@@ -113,8 +113,10 @@ func listenStreamLinux(lfd listenFD, cid, port uint32) (*listener, error) {
 		Port:      lsavm.Port,
 	}
 
-	return &listener{
-		fd:   lfd,
-		addr: addr,
+	return &Listener{
+		l: &listener{
+			fd:   lfd,
+			addr: addr,
+		},
 	}, nil
 }
