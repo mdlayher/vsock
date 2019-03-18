@@ -52,6 +52,12 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		Port: remotePort,
 	}
 
+	var (
+		closed      bool
+		closedRead  bool
+		closedWrite bool
+	)
+
 	cfd := &testConnFD{
 		connect: func(sa unix.Sockaddr) error {
 			if diff := cmp.Diff(rsa, sa.(*unix.SockaddrVM), cmp.AllowUnexported(*rsa)); diff != "" {
@@ -66,6 +72,22 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		setNonblocking: func(name string) error {
 			if diff := cmp.Diff(name, "vsock:vm(3):1024"); diff != "" {
 				t.Fatalf("unexpected non-blocking file name (-want +got):\n%s", diff)
+			}
+
+			return nil
+		},
+		close: func() error {
+			closed = true
+			return nil
+		},
+		shutdown: func(how int) error {
+			switch how {
+			case unix.SHUT_RD:
+				closedRead = true
+			case unix.SHUT_WR:
+				closedWrite = true
+			default:
+				t.Fatalf("unexpected how constant in shutdown: %d", how)
 			}
 
 			return nil
@@ -93,5 +115,23 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 
 	if diff := cmp.Diff(remoteAddr, c.RemoteAddr()); diff != "" {
 		t.Fatalf("unexpected remote address (-want +got):\n%s", diff)
+	}
+
+	// Verify Close/Shutdown plumbing.
+	funcs := []func() error{
+		c.Close,
+		c.CloseRead,
+		c.CloseWrite,
+	}
+
+	for i, fn := range funcs {
+		if err := fn(); err != nil {
+			t.Fatalf("failed to invoke function %d: %v", i, err)
+		}
+	}
+
+	if !closed || !closedRead || !closedWrite {
+		t.Fatalf("expected calls to Close (%t), CloseRead (%t), and CloseWrite (%t)",
+			closed, closedRead, closedWrite)
 	}
 }

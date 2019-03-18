@@ -50,3 +50,21 @@ func (lfd *sysListenFD) accept4(flags int) (int, unix.Sockaddr, error) {
 }
 
 func (lfd *sysListenFD) setDeadline(t time.Time) error { return lfd.f.SetDeadline(t) }
+
+func (cfd *sysConnFD) shutdown(how int) error {
+	// In Go 1.12+, we make use of runtime network poller integration to allow
+	// net.Listener.Accept to be unblocked by a call to net.Listener.Close.
+	rc, err := cfd.f.SyscallConn()
+	if err != nil {
+		return err
+	}
+
+	doErr := rc.Control(func(fd uintptr) {
+		err = unix.Shutdown(int(fd), how)
+	})
+	if doErr != nil {
+		return doErr
+	}
+
+	return err
+}

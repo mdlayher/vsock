@@ -37,3 +37,5 @@ func (*conn) SetWriteDeadline(_ time.Time) error { return errUnimplemented }
 func (*conn) Read(_ []byte) (int, error)         { return 0, errUnimplemented }
 func (*conn) Write(_ []byte) (int, error)        { return 0, errUnimplemented }
 func (*conn) Close() error                       { return errUnimplemented }
+func (*conn) CloseRead() error                   { return errUnimplemented }
+func (*conn) CloseWrite() error                  { return errUnimplemented }

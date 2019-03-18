@@ -1,5 +1,3 @@
-// Package vsock provides access to Linux VM sockets (AF_VSOCK) for
-// communication between a hypervisor and its virtual machines.
 package vsock
 
 import (
@@ -83,6 +81,18 @@ type Conn struct {
 
 // Close closes the connection.
 func (c *Conn) Close() error { return c.c.Close() }
+
+// CloseRead shuts down the reading side of the VM sockets connection. Most
+// callers should just use Close.
+//
+// CloseRead only works with Go 1.12+.
+func (c *Conn) CloseRead() error { return c.c.CloseRead() }
+
+// CloseWrite shuts down the writing side of the VM sockets connection. Most
+// callers should just use Close.
+//
+// CloseWrite only works with Go 1.12+.
+func (c *Conn) CloseWrite() error { return c.c.CloseWrite() }
 
 // LocalAddr returns the local network address. The Addr returned is shared by
 // all invocations of LocalAddr, so do not modify it.

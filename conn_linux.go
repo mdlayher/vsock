@@ -27,6 +27,8 @@ func (c *conn) SetWriteDeadline(t time.Time) error { return c.fd.SetWriteDeadlin
 func (c *conn) Read(b []byte) (n int, err error)   { return c.fd.Read(b) }
 func (c *conn) Write(b []byte) (n int, err error)  { return c.fd.Write(b) }
 func (c *conn) Close() error                       { return c.fd.Close() }
+func (c *conn) CloseRead() error                   { return c.fd.Shutdown(unix.SHUT_RD) }
+func (c *conn) CloseWrite() error                  { return c.fd.Shutdown(unix.SHUT_WR) }
 
 // newConn creates a Conn using a connFD, immediately setting the connFD to
 // non-blocking mode for use with the runtime network poller.

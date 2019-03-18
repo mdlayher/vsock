@@ -1,6 +1,7 @@
 package vsock
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -96,6 +97,7 @@ type connFD interface {
 	EarlyClose() error
 	Connect(sa unix.Sockaddr) error
 	Getsockname() (unix.Sockaddr, error)
+	Shutdown(how int) error
 	SetNonblocking(name string) error
 	SetDeadline(t time.Time) error
 	SetReadDeadline(t time.Time) error
@@ -165,7 +167,21 @@ func (cfd *sysConnFD) Read(b []byte) (int, error) {
 	return n, err
 }
 
+func (cfd *sysConnFD) Shutdown(how int) error {
+	switch how {
+	case unix.SHUT_RD, unix.SHUT_WR:
+	default:
+		panicf("vsock: sysConnFD.Shutdown method invoked with invalid how constant: %d", how)
+	}
+
+	return cfd.shutdown(how)
+}
+
 func (cfd *sysConnFD) Write(b []byte) (int, error)        { return cfd.f.Write(b) }
 func (cfd *sysConnFD) SetDeadline(t time.Time) error      { return cfd.f.SetDeadline(t) }
 func (cfd *sysConnFD) SetReadDeadline(t time.Time) error  { return cfd.f.SetReadDeadline(t) }
 func (cfd *sysConnFD) SetWriteDeadline(t time.Time) error { return cfd.f.SetWriteDeadline(t) }
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
+}

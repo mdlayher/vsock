@@ -44,6 +44,7 @@ type testConnFD struct {
 	setDeadline      func(t time.Time) error
 	setReadDeadline  func(t time.Time) error
 	setWriteDeadline func(t time.Time) error
+	shutdown         func(how int) error
 }
 
 func (cfd *testConnFD) Read(b []byte) (int, error)  { return cfd.read(b) }
@@ -59,3 +60,4 @@ func (cfd *testConnFD) SetNonblocking(name string) error    { return cfd.setNonb
 func (cfd *testConnFD) SetDeadline(t time.Time) error       { return cfd.setDeadline(t) }
 func (cfd *testConnFD) SetReadDeadline(t time.Time) error   { return cfd.setReadDeadline(t) }
 func (cfd *testConnFD) SetWriteDeadline(t time.Time) error  { return cfd.setWriteDeadline(t) }
+func (cfd *testConnFD) Shutdown(how int) error              { return cfd.shutdown(how) }

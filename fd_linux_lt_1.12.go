@@ -17,8 +17,13 @@ func (lfd *sysListenFD) accept4(flags int) (int, unix.Sockaddr, error) {
 	return unix.Accept4(lfd.fd, flags)
 }
 
-func (lfd *sysListenFD) setDeadline(t time.Time) error {
+func (*sysListenFD) setDeadline(_ time.Time) error {
 	// Listener deadlines won't work as expected in this version of Go, so
 	// return an early error.
 	return fmt.Errorf("vsock: listener deadlines not supported on %s", runtime.Version())
+}
+
+func (*sysConnFD) shutdown(_ int) error {
+	// Shutdown functionality is not available in this version on Go.
+	return fmt.Errorf("vsock: close conn read/write not supported on %s", runtime.Version())
 }
