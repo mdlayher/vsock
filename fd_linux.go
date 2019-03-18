@@ -99,9 +99,7 @@ type connFD interface {
 	Getsockname() (unix.Sockaddr, error)
 	Shutdown(how int) error
 	SetNonblocking(name string) error
-	SetDeadline(t time.Time) error
-	SetReadDeadline(t time.Time) error
-	SetWriteDeadline(t time.Time) error
+	SetDeadline(t time.Time, typ deadlineType) error
 }
 
 var _ connFD = &sysConnFD{}
@@ -167,20 +165,31 @@ func (cfd *sysConnFD) Read(b []byte) (int, error) {
 	return n, err
 }
 
+func (cfd *sysConnFD) Write(b []byte) (int, error) { return cfd.f.Write(b) }
+
 func (cfd *sysConnFD) Shutdown(how int) error {
 	switch how {
 	case unix.SHUT_RD, unix.SHUT_WR:
+		return cfd.shutdown(how)
 	default:
 		panicf("vsock: sysConnFD.Shutdown method invoked with invalid how constant: %d", how)
+		return nil
 	}
-
-	return cfd.shutdown(how)
 }
 
-func (cfd *sysConnFD) Write(b []byte) (int, error)        { return cfd.f.Write(b) }
-func (cfd *sysConnFD) SetDeadline(t time.Time) error      { return cfd.f.SetDeadline(t) }
-func (cfd *sysConnFD) SetReadDeadline(t time.Time) error  { return cfd.f.SetReadDeadline(t) }
-func (cfd *sysConnFD) SetWriteDeadline(t time.Time) error { return cfd.f.SetWriteDeadline(t) }
+func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
+	switch typ {
+	case deadline:
+		return cfd.f.SetDeadline(t)
+	case readDeadline:
+		return cfd.f.SetReadDeadline(t)
+	case writeDeadline:
+		return cfd.f.SetWriteDeadline(t)
+	default:
+		panicf("vsock: sysConnFD.SetDeadline method invoked with invalid deadline type constant: %d", typ)
+		return nil
+	}
+}
 
 func panicf(format string, a ...interface{}) {
 	panic(fmt.Sprintf(format, a...))

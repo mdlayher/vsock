@@ -115,14 +115,24 @@ func (c *Conn) Read(b []byte) (n int, err error) { return c.fd.Read(b) }
 // Write implements the net.Conn Write method.
 func (c *Conn) Write(b []byte) (n int, err error) { return c.fd.Write(b) }
 
+// A deadlineType specifies the type of deadline to set for a Conn.
+type deadlineType int
+
+// Possible deadlineType values.
+const (
+	deadline deadlineType = iota
+	readDeadline
+	writeDeadline
+)
+
 // SetDeadline implements the net.Conn SetDeadline method.
-func (c *Conn) SetDeadline(t time.Time) error { return c.fd.SetDeadline(t) }
+func (c *Conn) SetDeadline(t time.Time) error { return c.fd.SetDeadline(t, deadline) }
 
 // SetReadDeadline implements the net.Conn SetReadDeadline method.
-func (c *Conn) SetReadDeadline(t time.Time) error { return c.fd.SetReadDeadline(t) }
+func (c *Conn) SetReadDeadline(t time.Time) error { return c.fd.SetDeadline(t, readDeadline) }
 
 // SetWriteDeadline implements the net.Conn SetWriteDeadline method.
-func (c *Conn) SetWriteDeadline(t time.Time) error { return c.fd.SetWriteDeadline(t) }
+func (c *Conn) SetWriteDeadline(t time.Time) error { return c.fd.SetDeadline(t, writeDeadline) }
 
 // TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 

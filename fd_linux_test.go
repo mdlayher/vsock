@@ -35,16 +35,14 @@ func (lfd *testListenFD) SetDeadline(t time.Time) error       { return lfd.setDe
 var _ connFD = &testConnFD{}
 
 type testConnFD struct {
-	read             func(b []byte) (int, error)
-	write            func(b []byte) (int, error)
-	close            func() error
-	connect          func(sa unix.Sockaddr) error
-	getsockname      func() (unix.Sockaddr, error)
-	setNonblocking   func(name string) error
-	setDeadline      func(t time.Time) error
-	setReadDeadline  func(t time.Time) error
-	setWriteDeadline func(t time.Time) error
-	shutdown         func(how int) error
+	read           func(b []byte) (int, error)
+	write          func(b []byte) (int, error)
+	close          func() error
+	connect        func(sa unix.Sockaddr) error
+	getsockname    func() (unix.Sockaddr, error)
+	setNonblocking func(name string) error
+	setDeadline    func(t time.Time, typ deadlineType) error
+	shutdown       func(how int) error
 }
 
 func (cfd *testConnFD) Read(b []byte) (int, error)  { return cfd.read(b) }
@@ -57,7 +55,7 @@ func (cfd *testConnFD) EarlyClose() error {
 func (cfd *testConnFD) Connect(sa unix.Sockaddr) error      { return cfd.connect(sa) }
 func (cfd *testConnFD) Getsockname() (unix.Sockaddr, error) { return cfd.getsockname() }
 func (cfd *testConnFD) SetNonblocking(name string) error    { return cfd.setNonblocking(name) }
-func (cfd *testConnFD) SetDeadline(t time.Time) error       { return cfd.setDeadline(t) }
-func (cfd *testConnFD) SetReadDeadline(t time.Time) error   { return cfd.setReadDeadline(t) }
-func (cfd *testConnFD) SetWriteDeadline(t time.Time) error  { return cfd.setWriteDeadline(t) }
-func (cfd *testConnFD) Shutdown(how int) error              { return cfd.shutdown(how) }
+func (cfd *testConnFD) SetDeadline(t time.Time, typ deadlineType) error {
+	return cfd.setDeadline(t, typ)
+}
+func (cfd *testConnFD) Shutdown(how int) error { return cfd.shutdown(how) }
