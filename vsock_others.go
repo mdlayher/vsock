@@ -27,15 +27,14 @@ func (*listener) SetDeadline(_ time.Time) error { return errUnimplemented }
 
 func dialStream(_, _ uint32) (*Conn, error) { return nil, errUnimplemented }
 
-type conn struct{}
+type connFD struct{}
 
-func (*conn) LocalAddr() net.Addr                { return nil }
-func (*conn) RemoteAddr() net.Addr               { return nil }
-func (*conn) SetDeadline(_ time.Time) error      { return errUnimplemented }
-func (*conn) SetReadDeadline(_ time.Time) error  { return errUnimplemented }
-func (*conn) SetWriteDeadline(_ time.Time) error { return errUnimplemented }
-func (*conn) Read(_ []byte) (int, error)         { return 0, errUnimplemented }
-func (*conn) Write(_ []byte) (int, error)        { return 0, errUnimplemented }
-func (*conn) Close() error                       { return errUnimplemented }
-func (*conn) CloseRead() error                   { return errUnimplemented }
-func (*conn) CloseWrite() error                  { return errUnimplemented }
+func (*connFD) LocalAddr() net.Addr                { return nil }
+func (*connFD) RemoteAddr() net.Addr               { return nil }
+func (*connFD) SetDeadline(_ time.Time) error      { return errUnimplemented }
+func (*connFD) SetReadDeadline(_ time.Time) error  { return errUnimplemented }
+func (*connFD) SetWriteDeadline(_ time.Time) error { return errUnimplemented }
+func (*connFD) Read(_ []byte) (int, error)         { return 0, errUnimplemented }
+func (*connFD) Write(_ []byte) (int, error)        { return 0, errUnimplemented }
+func (*connFD) Close() error                       { return errUnimplemented }
+func (*connFD) Shutdown(_ int) error               { return errUnimplemented }

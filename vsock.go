@@ -18,6 +18,11 @@ const (
 	// cidReserved is a reserved context ID that is no longer in use,
 	// and cannot be used for socket communications.
 	cidReserved = 0x1
+
+	// shutRd and shutWr are arguments for unix.Shutdown, copied here to avoid
+	// importing x/sys/unix in cross-platform code.
+	shutRd = 0 // unix.SHUT_RD
+	shutWr = 1 // unix.SHUT_WR
 )
 
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
@@ -76,46 +81,48 @@ var _ net.Conn = &Conn{}
 
 // A Conn is a VM sockets implementation of a net.Conn.
 type Conn struct {
-	c *conn
+	fd     connFD
+	local  *Addr
+	remote *Addr
 }
 
 // Close closes the connection.
-func (c *Conn) Close() error { return c.c.Close() }
+func (c *Conn) Close() error { return c.fd.Close() }
 
 // CloseRead shuts down the reading side of the VM sockets connection. Most
 // callers should just use Close.
 //
 // CloseRead only works with Go 1.12+.
-func (c *Conn) CloseRead() error { return c.c.CloseRead() }
+func (c *Conn) CloseRead() error { return c.fd.Shutdown(shutRd) }
 
 // CloseWrite shuts down the writing side of the VM sockets connection. Most
 // callers should just use Close.
 //
 // CloseWrite only works with Go 1.12+.
-func (c *Conn) CloseWrite() error { return c.c.CloseWrite() }
+func (c *Conn) CloseWrite() error { return c.fd.Shutdown(shutWr) }
 
 // LocalAddr returns the local network address. The Addr returned is shared by
 // all invocations of LocalAddr, so do not modify it.
-func (c *Conn) LocalAddr() net.Addr { return c.c.LocalAddr() }
+func (c *Conn) LocalAddr() net.Addr { return c.local }
 
 // RemoteAddr returns the remote network address. The Addr returned is shared by
 // all invocations of RemoteAddr, so do not modify it.
-func (c *Conn) RemoteAddr() net.Addr { return c.c.RemoteAddr() }
+func (c *Conn) RemoteAddr() net.Addr { return c.remote }
 
 // Read implements the net.Conn Read method.
-func (c *Conn) Read(b []byte) (n int, err error) { return c.c.Read(b) }
+func (c *Conn) Read(b []byte) (n int, err error) { return c.fd.Read(b) }
 
 // Write implements the net.Conn Write method.
-func (c *Conn) Write(b []byte) (n int, err error) { return c.c.Write(b) }
+func (c *Conn) Write(b []byte) (n int, err error) { return c.fd.Write(b) }
 
 // SetDeadline implements the net.Conn SetDeadline method.
-func (c *Conn) SetDeadline(t time.Time) error { return c.c.SetDeadline(t) }
+func (c *Conn) SetDeadline(t time.Time) error { return c.fd.SetDeadline(t) }
 
 // SetReadDeadline implements the net.Conn SetReadDeadline method.
-func (c *Conn) SetReadDeadline(t time.Time) error { return c.c.SetReadDeadline(t) }
+func (c *Conn) SetReadDeadline(t time.Time) error { return c.fd.SetReadDeadline(t) }
 
 // SetWriteDeadline implements the net.Conn SetWriteDeadline method.
-func (c *Conn) SetWriteDeadline(t time.Time) error { return c.c.SetWriteDeadline(t) }
+func (c *Conn) SetWriteDeadline(t time.Time) error { return c.fd.SetWriteDeadline(t) }
 
 // TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 

@@ -3,32 +3,8 @@
 package vsock
 
 import (
-	"net"
-	"time"
-
 	"golang.org/x/sys/unix"
 )
-
-var _ net.Conn = &conn{}
-
-// A conn is the net.Conn implementation for VM sockets.
-type conn struct {
-	fd         connFD
-	localAddr  *Addr
-	remoteAddr *Addr
-}
-
-// Implement net.Conn for type conn.
-func (c *conn) LocalAddr() net.Addr                { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr               { return c.remoteAddr }
-func (c *conn) SetDeadline(t time.Time) error      { return c.fd.SetDeadline(t) }
-func (c *conn) SetReadDeadline(t time.Time) error  { return c.fd.SetReadDeadline(t) }
-func (c *conn) SetWriteDeadline(t time.Time) error { return c.fd.SetWriteDeadline(t) }
-func (c *conn) Read(b []byte) (n int, err error)   { return c.fd.Read(b) }
-func (c *conn) Write(b []byte) (n int, err error)  { return c.fd.Write(b) }
-func (c *conn) Close() error                       { return c.fd.Close() }
-func (c *conn) CloseRead() error                   { return c.fd.Shutdown(unix.SHUT_RD) }
-func (c *conn) CloseWrite() error                  { return c.fd.Shutdown(unix.SHUT_WR) }
 
 // newConn creates a Conn using a connFD, immediately setting the connFD to
 // non-blocking mode for use with the runtime network poller.
@@ -40,11 +16,9 @@ func newConn(cfd connFD, local, remote *Addr) (*Conn, error) {
 	}
 
 	return &Conn{
-		c: &conn{
-			fd:         cfd,
-			localAddr:  local,
-			remoteAddr: remote,
-		},
+		fd:     cfd,
+		local:  local,
+		remote: remote,
 	}, nil
 }
 
