@@ -55,7 +55,7 @@ func Test_localContextIDGuest(t *testing.T) {
 		ioctl: ioctl,
 	}
 
-	if err := localContextID(fs, &cid); err != nil {
+	if err := sysContextID(fs, &cid); err != nil {
 		t.Fatalf("failed to retrieve host's context ID: %v", err)
 	}
 
@@ -70,10 +70,12 @@ func Test_localContextIDGuestIntegration(t *testing.T) {
 		t.Skip("machine is not a guest, skipping")
 	}
 
-	var cid uint32
-	if err := localContextID(sysFS{}, &cid); err != nil {
+	cid, err := ContextID()
+	if err != nil {
 		t.Fatalf("failed to retrieve guest's context ID: %v", err)
 	}
+
+	t.Logf("guest context ID: %d", cid)
 
 	// Guests should always have a context ID of 3 or more, since
 	// 0-2 are invalid or reserved.
@@ -87,10 +89,12 @@ func Test_localContextIDHostIntegration(t *testing.T) {
 		t.Skip("machine is not a hypervisor, skipping")
 	}
 
-	var cid uint32
-	if err := localContextID(sysFS{}, &cid); err != nil {
+	cid, err := ContextID()
+	if err != nil {
 		t.Fatalf("failed to retrieve host's context ID: %v", err)
 	}
+
+	t.Logf("host context ID: %d", cid)
 
 	if want, got := uint32(Host), cid; want != got {
 		t.Fatalf("unexpected host context ID:\n- want: %d\n-  got: %d",
@@ -106,8 +110,8 @@ func isHypervisor(t *testing.T) bool {
 		t.Skipf("device %q not available, kernel module not loaded?", devVsock)
 	}
 
-	var cid uint32
-	if err := localContextID(sysFS{}, &cid); err != nil {
+	cid, err := ContextID()
+	if err != nil {
 		if os.IsPermission(err) {
 			t.Skipf("permission denied, make sure user has access to %q", devVsock)
 		}

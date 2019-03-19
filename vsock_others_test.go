@@ -7,6 +7,11 @@ import "testing"
 func TestUnimplemented(t *testing.T) {
 	want := errUnimplemented
 
+	if _, got := ContextID(); want != got {
+		t.Fatalf("unexpected error from ContextID:\n- want: %v\n-  got: %v",
+			want, got)
+	}
+
 	if _, got := listenStream(0); want != got {
 		t.Fatalf("unexpected error from listenStream:\n- want: %v\n-  got: %v",
 			want, got)
