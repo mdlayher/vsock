@@ -20,12 +20,23 @@ type fs interface {
 	Ioctl(fd uintptr, request int, argp unsafe.Pointer) error
 }
 
-// localContextID retrieves the local context ID for this system, using the
-// methods from fs.  The context ID is stored in cid for later use.
+// contextID retrieves the local context ID for this system.
+func contextID() (uint32, error) {
+	// Fetch the context ID using a real filesystem.
+	var cid uint32
+	if err := sysContextID(sysFS{}, &cid); err != nil {
+		return 0, err
+	}
+
+	return cid, nil
+}
+
+// sysContextID retrieves the local context ID for this system, using the
+// methods from fs. The context ID is stored in cid for later use.
 //
 // This method uses this signature to enable easier testing without unsafe
 // usage of unsafe.Pointer.
-func localContextID(fs fs, cid *uint32) error {
+func sysContextID(fs fs, cid *uint32) error {
 	f, err := fs.Open(devVsock)
 	if err != nil {
 		return err

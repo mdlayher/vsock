@@ -42,8 +42,8 @@ func (l *listener) Accept() (net.Conn, error) {
 
 // listenStream is the entry point for ListenStream on Linux.
 func listenStream(port uint32) (*Listener, error) {
-	var cid uint32
-	if err := localContextID(sysFS{}, &cid); err != nil {
+	cid, err := ContextID()
+	if err != nil {
 		return nil, err
 	}
 

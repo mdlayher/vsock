@@ -170,3 +170,13 @@ func (a *Addr) String() string {
 func (a *Addr) fileName() string {
 	return fmt.Sprintf("%s:%s", a.Network(), a.String())
 }
+
+// ContextID retrieves the local VM sockets context ID for this system.
+// ContextID can be used to directly determine if a system is capable of using
+// VM sockets.
+//
+// If the kernel module is unavailable, access to the kernel module is denied,
+// or VM sockets are unsupported on this system, it returns an error.
+func ContextID() (uint32, error) {
+	return contextID()
+}
