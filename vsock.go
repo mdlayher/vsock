@@ -1,8 +1,12 @@
 package vsock
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -23,6 +27,17 @@ const (
 	// importing x/sys/unix in cross-platform code.
 	shutRd = 0 // unix.SHUT_RD
 	shutWr = 1 // unix.SHUT_WR
+
+	// network is the vsock network reported in net.OpError.
+	network = "vsock"
+
+	// Operation names which may be returned in net.OpError.
+	opClose  = "close"
+	opDial   = "dial"
+	opListen = "listen"
+	opRead   = "read"
+	opSet    = "set"
+	opWrite  = "write"
 )
 
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
@@ -74,7 +89,20 @@ func (l *Listener) SetDeadline(t time.Time) error { return l.l.SetDeadline(t) }
 //
 // When the connection is no longer needed, Close must be called to free resources.
 func Dial(contextID, port uint32) (*Conn, error) {
-	return dialStream(contextID, port)
+	c, err := dialStream(contextID, port)
+	if err != nil {
+		// Create a minimal Conn to generate a proper net.OpError.
+		c := &Conn{
+			remote: &Addr{
+				ContextID: contextID,
+				Port:      port,
+			},
+		}
+
+		return nil, c.opError(opDial, err)
+	}
+
+	return c, nil
 }
 
 var _ net.Conn = &Conn{}
@@ -87,19 +115,25 @@ type Conn struct {
 }
 
 // Close closes the connection.
-func (c *Conn) Close() error { return c.fd.Close() }
+func (c *Conn) Close() error {
+	return c.opError(opClose, c.fd.Close())
+}
 
 // CloseRead shuts down the reading side of the VM sockets connection. Most
 // callers should just use Close.
 //
 // CloseRead only works with Go 1.12+.
-func (c *Conn) CloseRead() error { return c.fd.Shutdown(shutRd) }
+func (c *Conn) CloseRead() error {
+	return c.opError(opClose, c.fd.Shutdown(shutRd))
+}
 
 // CloseWrite shuts down the writing side of the VM sockets connection. Most
 // callers should just use Close.
 //
 // CloseWrite only works with Go 1.12+.
-func (c *Conn) CloseWrite() error { return c.fd.Shutdown(shutWr) }
+func (c *Conn) CloseWrite() error {
+	return c.opError(opClose, c.fd.Shutdown(shutWr))
+}
 
 // LocalAddr returns the local network address. The Addr returned is shared by
 // all invocations of LocalAddr, so do not modify it.
@@ -110,10 +144,24 @@ func (c *Conn) LocalAddr() net.Addr { return c.local }
 func (c *Conn) RemoteAddr() net.Addr { return c.remote }
 
 // Read implements the net.Conn Read method.
-func (c *Conn) Read(b []byte) (n int, err error) { return c.fd.Read(b) }
+func (c *Conn) Read(b []byte) (int, error) {
+	n, err := c.fd.Read(b)
+	if err != nil {
+		return n, c.opError(opRead, err)
+	}
+
+	return n, nil
+}
 
 // Write implements the net.Conn Write method.
-func (c *Conn) Write(b []byte) (n int, err error) { return c.fd.Write(b) }
+func (c *Conn) Write(b []byte) (int, error) {
+	n, err := c.fd.Write(b)
+	if err != nil {
+		return n, c.opError(opWrite, err)
+	}
+
+	return n, nil
+}
 
 // A deadlineType specifies the type of deadline to set for a Conn.
 type deadlineType int
@@ -126,13 +174,77 @@ const (
 )
 
 // SetDeadline implements the net.Conn SetDeadline method.
-func (c *Conn) SetDeadline(t time.Time) error { return c.fd.SetDeadline(t, deadline) }
+func (c *Conn) SetDeadline(t time.Time) error {
+	return c.opError(opSet, c.fd.SetDeadline(t, deadline))
+}
 
 // SetReadDeadline implements the net.Conn SetReadDeadline method.
-func (c *Conn) SetReadDeadline(t time.Time) error { return c.fd.SetDeadline(t, readDeadline) }
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return c.opError(opSet, c.fd.SetDeadline(t, readDeadline))
+}
 
 // SetWriteDeadline implements the net.Conn SetWriteDeadline method.
-func (c *Conn) SetWriteDeadline(t time.Time) error { return c.fd.SetDeadline(t, writeDeadline) }
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return c.opError(opSet, c.fd.SetDeadline(t, writeDeadline))
+}
+
+// opError unpacks err if possible, producing a net.OpError with op and err in
+// order to implement net.Conn. As a convenience, opError returns nil if the
+// input error is nil.
+func (c *Conn) opError(op string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Unwrap inner errors from error types.
+	//
+	// TODO(mdlayher): errors.Cause or similar in Go 1.13.
+	switch xerr := err.(type) {
+	// os.PathError produced by os.File method calls.
+	case *os.PathError:
+		// Although we could make use of xerr.Op here, we're passing it manually
+		// for consistency, since some of the Conn calls we are making don't
+		// wrap an os.File, which would return an Op for us.
+		err = xerr.Err
+	}
+
+	switch {
+	case isENOTCONN(err):
+		// "transport not connected" means io.EOF in Go.
+		return io.EOF
+	case err == os.ErrClosed, strings.Contains(err.Error(), "use of closed"):
+		// net.TCPConn uses an error with this text from internal/poll for the
+		// backing file already being closed.
+		err = errors.New("use of closed network connection")
+	default:
+		// Nothing to do, return this directly.
+	}
+
+	// Determine source and addr using the rules defined by net.OpError's
+	// documentation: https://golang.org/pkg/net/#OpError.
+	var source, addr net.Addr
+	switch op {
+	case opClose, opDial, opRead, opWrite:
+		if c.local != nil {
+			source = c.local
+		}
+		if c.remote != nil {
+			addr = c.remote
+		}
+	case opSet:
+		if c.local != nil {
+			addr = c.local
+		}
+	}
+
+	return &net.OpError{
+		Op:     op,
+		Net:    network,
+		Source: source,
+		Addr:   addr,
+		Err:    err,
+	}
+}
 
 // TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 
@@ -145,7 +257,7 @@ type Addr struct {
 }
 
 // Network returns the address's network name, "vsock".
-func (a *Addr) Network() string { return "vsock" }
+func (a *Addr) Network() string { return network }
 
 // String returns a human-readable representation of Addr, and indicates if
 // ContextID is meant to be used for a hypervisor, host, VM, etc.
