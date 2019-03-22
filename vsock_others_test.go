@@ -12,7 +12,7 @@ func TestUnimplemented(t *testing.T) {
 			want, got)
 	}
 
-	if _, got := listenStream(0); want != got {
+	if _, got := listenStream(0, 0); want != got {
 		t.Fatalf("unexpected error from listenStream:\n- want: %v\n-  got: %v",
 			want, got)
 	}
