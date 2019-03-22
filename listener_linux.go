@@ -41,12 +41,7 @@ func (l *listener) Accept() (net.Conn, error) {
 }
 
 // listenStream is the entry point for ListenStream on Linux.
-func listenStream(port uint32) (*Listener, error) {
-	cid, err := ContextID()
-	if err != nil {
-		return nil, err
-	}
-
+func listenStream(cid, port uint32) (*Listener, error) {
 	lfd, err := newListenFD()
 	if err != nil {
 		return nil, err

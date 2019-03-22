@@ -8,12 +8,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const (
-	// devVsock is the location of /dev/vsock.  It is exposed on both the
-	// hypervisor and on virtual machines.
-	devVsock = "/dev/vsock"
-)
-
 // A fs is an interface over the filesystem and ioctl, to enable testing.
 type fs interface {
 	Open(name string) (*os.File, error)

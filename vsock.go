@@ -33,6 +33,10 @@ const (
 	ebadf    = 9
 	enotconn = 107
 
+	// devVsock is the location of /dev/vsock.  It is exposed on both the
+	// hypervisor and on virtual machines.
+	devVsock = "/dev/vsock"
+
 	// network is the vsock network reported in net.OpError.
 	network = "vsock"
 
@@ -54,12 +58,19 @@ const (
 //
 // When the Listener is no longer needed, Close must be called to free resources.
 func Listen(port uint32) (*Listener, error) {
-	l, err := listenStream(port)
+	cid, err := ContextID()
 	if err != nil {
-		// No addresses available, and we don't parse the context ID for this
-		// machine on init.
-		// TODO(mdlayher): figure out a way to plumb in the local address.
+		// No addresses available.
 		return nil, opError(opListen, err, nil, nil)
+	}
+
+	l, err := listenStream(cid, port)
+	if err != nil {
+		// No remote address available.
+		return nil, opError(opListen, err, &Addr{
+			ContextID: cid,
+			Port:      port,
+		}, nil)
 	}
 
 	return l, nil
@@ -286,7 +297,13 @@ func opError(op string, err error, local, remote net.Addr) error {
 		// Although we could make use of xerr.Op here, we're passing it manually
 		// for consistency, since some of the Conn calls we are making don't
 		// wrap an os.File, which would return an Op for us.
-		err = xerr.Err
+		//
+		// As a special case, if the error is related to access to the /dev/vsock
+		// device, we don't unwrap it, so the caller has more context as to why
+		// their operation actually failed than "permission denied" or similar.
+		if xerr.Path != devVsock {
+			err = xerr.Err
+		}
 	}
 
 	switch {

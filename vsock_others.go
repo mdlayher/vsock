@@ -16,7 +16,7 @@ var (
 		runtime.GOOS, runtime.GOARCH)
 )
 
-func listenStream(_ uint32) (*Listener, error) { return nil, errUnimplemented }
+func listenStream(_, _ uint32) (*Listener, error) { return nil, errUnimplemented }
 
 type listener struct{}
 
