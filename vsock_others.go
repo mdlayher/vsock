@@ -38,3 +38,5 @@ func (*connFD) Close() error                                  { return errUnimpl
 func (*connFD) Shutdown(_ int) error                          { return errUnimplemented }
 
 func contextID() (uint32, error) { return 0, errUnimplemented }
+
+func isErrno(_ error, _ int) bool { return false }

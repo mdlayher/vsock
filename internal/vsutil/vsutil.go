@@ -3,7 +3,11 @@ package vsutil
 
 import (
 	"net"
+	"os"
+	"testing"
 	"time"
+
+	"github.com/mdlayher/vsock"
 )
 
 // Accept blocks until a single connection is accepted by the net.Listener.
@@ -40,5 +44,36 @@ func Accept(l net.Listener, timeout time.Duration) (net.Conn, error) {
 		// Got a connection, stop the timer.
 		cancel()
 		return c, nil
+	}
+}
+
+// IsHypervisor detects if this machine is a hypervisor by determining if
+// /dev/vsock is available, and then if its context ID matches the one assigned
+// to hosts.
+func IsHypervisor(t *testing.T) bool {
+	cid, err := vsock.ContextID()
+	if err != nil {
+		SkipDeviceError(t, err)
+
+		t.Fatalf("failed to retrieve context ID: %v", err)
+	}
+
+	return cid == vsock.Host
+}
+
+// SkipDeviceError skips this test if err is related to a failure to access the
+// /dev/vsock device.
+func SkipDeviceError(t *testing.T, err error) {
+	// Unwrap net.OpError if needed.
+	// TODO(mdlayher): errors.Unwrap in Go 1.13.
+	if nerr, ok := err.(*net.OpError); ok {
+		err = nerr.Err
+	}
+
+	if os.IsNotExist(err) {
+		t.Skipf("skipping, vsock device does not exist (try: 'modprobe vhost_vsock'): %v", err)
+	}
+	if os.IsPermission(err) {
+		t.Skipf("skipping, permission denied (try: 'chmod 666 /dev/vsock'): %v", err)
 	}
 }

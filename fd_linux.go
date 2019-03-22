@@ -153,18 +153,7 @@ func (cfd *sysConnFD) Close() error {
 	return cfd.f.Close()
 }
 
-func (cfd *sysConnFD) Read(b []byte) (int, error) {
-	n, err := cfd.f.Read(b)
-	if err != nil {
-		// "transport not connected" means io.EOF in Go.
-		if perr, ok := err.(*os.PathError); ok && perr.Err == unix.ENOTCONN {
-			return n, io.EOF
-		}
-	}
-
-	return n, err
-}
-
+func (cfd *sysConnFD) Read(b []byte) (int, error)  { return cfd.f.Read(b) }
 func (cfd *sysConnFD) Write(b []byte) (int, error) { return cfd.f.Write(b) }
 
 func (cfd *sysConnFD) Shutdown(how int) error {
@@ -188,6 +177,19 @@ func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
 	default:
 		panicf("vsock: sysConnFD.SetDeadline method invoked with invalid deadline type constant: %d", typ)
 		return nil
+	}
+}
+
+// isErrno determines if an error a matches UNIX error number.
+func isErrno(err error, errno int) bool {
+	switch errno {
+	case ebadf:
+		return err == unix.EBADF
+	case enotconn:
+		return err == unix.ENOTCONN
+	default:
+		panicf("vsock: isErrno called with unhandled error number parameter: %d", errno)
+		return false
 	}
 }
 
