@@ -64,6 +64,12 @@ func IsHypervisor(t *testing.T) bool {
 // SkipDeviceError skips this test if err is related to a failure to access the
 // /dev/vsock device.
 func SkipDeviceError(t *testing.T, err error) {
+	// Unwrap net.OpError if needed.
+	// TODO(mdlayher): errors.Unwrap in Go 1.13.
+	if nerr, ok := err.(*net.OpError); ok {
+		err = nerr.Err
+	}
+
 	if os.IsNotExist(err) {
 		t.Skipf("skipping, vsock device does not exist (try: 'modprobe vhost_vsock'): %v", err)
 	}

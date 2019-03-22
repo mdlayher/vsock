@@ -30,20 +30,20 @@ func TestIntegrationListenerUnblockAcceptAfterClose(t *testing.T) {
 		_, err := vsutil.Accept(l, 10*time.Second)
 		t.Log("after accept")
 
-		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+		nerr, ok := err.(*net.OpError)
+		if !ok {
+			t.Errorf("expected a net.OpError, but got: %#v", err)
+		}
+
+		if nerr.Temporary() {
 			t.Errorf("expected permanent error, but got temporary one: %v", err)
 		}
 
-		// Go1.11:
-		if strings.Contains(err.Error(), "bad file descriptor") {
-			// All is well, the file descriptor was closed.
-			return
-		}
-
-		// Go 1.12+:
-		// TODO(mdlayher): wrap string error in net.OpError or similar.
-		if !strings.Contains(err.Error(), "use of closed file") {
-			t.Errorf("unexpected accept error: %v", err)
+		// We mimic what net.TCPConn does and return an error with the same
+		// string as internal/poll, so string matching is the best we can do
+		// for now.
+		if !strings.Contains(nerr.Err.Error(), "use of closed") {
+			t.Errorf("expected close network connection error, but got: %v", nerr.Err)
 		}
 	}()
 

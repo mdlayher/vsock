@@ -39,4 +39,4 @@ func (*connFD) Shutdown(_ int) error                          { return errUnimpl
 
 func contextID() (uint32, error) { return 0, errUnimplemented }
 
-func isENOTCONN(err error) bool { return false }
+func isErrno(_ error, _ int) bool { return false }

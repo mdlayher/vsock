@@ -28,10 +28,16 @@ const (
 	shutRd = 0 // unix.SHUT_RD
 	shutWr = 1 // unix.SHUT_WR
 
+	// Error numbers we recognize, copied here to avoid importing x/sys/unix in
+	// cross-platform code.
+	ebadf    = 9
+	enotconn = 107
+
 	// network is the vsock network reported in net.OpError.
 	network = "vsock"
 
 	// Operation names which may be returned in net.OpError.
+	opAccept = "accept"
 	opClose  = "close"
 	opDial   = "dial"
 	opListen = "listen"
@@ -48,7 +54,15 @@ const (
 //
 // When the Listener is no longer needed, Close must be called to free resources.
 func Listen(port uint32) (*Listener, error) {
-	return listenStream(port)
+	l, err := listenStream(port)
+	if err != nil {
+		// No addresses available, and we don't parse the context ID for this
+		// machine on init.
+		// TODO(mdlayher): figure out a way to plumb in the local address.
+		return nil, opError(opListen, err, nil, nil)
+	}
+
+	return l, nil
 }
 
 var _ net.Listener = &Listener{}
@@ -61,7 +75,14 @@ type Listener struct {
 // Accept implements the Accept method in the net.Listener interface; it waits
 // for the next call and returns a generic net.Conn. The returned net.Conn will
 // always be of type *Conn.
-func (l *Listener) Accept() (net.Conn, error) { return l.l.Accept() }
+func (l *Listener) Accept() (net.Conn, error) {
+	c, err := l.l.Accept()
+	if err != nil {
+		return nil, l.opError(opAccept, err)
+	}
+
+	return c, nil
+}
 
 // Addr returns the listener's network address, a *Addr. The Addr returned is
 // shared by all invocations of Addr, so do not modify it.
@@ -69,13 +90,24 @@ func (l *Listener) Addr() net.Addr { return l.l.Addr() }
 
 // Close stops listening on the VM sockets address. Already Accepted connections
 // are not closed.
-func (l *Listener) Close() error { return l.l.Close() }
+func (l *Listener) Close() error {
+	return l.opError(opClose, l.l.Close())
+}
 
 // SetDeadline sets the deadline associated with the listener. A zero time value
 // disables the deadline.
 //
 // SetDeadline only works with Go 1.12+.
-func (l *Listener) SetDeadline(t time.Time) error { return l.l.SetDeadline(t) }
+func (l *Listener) SetDeadline(t time.Time) error {
+	return l.opError(opSet, l.l.SetDeadline(t))
+}
+
+// opError is a convenience for the function opError that also passes the local
+// address of the Listener.
+func (l *Listener) opError(op string, err error) error {
+	// No remote address for a Listener.
+	return opError(op, err, l.Addr(), nil)
+}
 
 // Dial dials a connection-oriented net.Conn to a VM sockets server.
 // The contextID and port parameters specify the address of the server.
@@ -91,15 +123,11 @@ func (l *Listener) SetDeadline(t time.Time) error { return l.l.SetDeadline(t) }
 func Dial(contextID, port uint32) (*Conn, error) {
 	c, err := dialStream(contextID, port)
 	if err != nil {
-		// Create a minimal Conn to generate a proper net.OpError.
-		c := &Conn{
-			remote: &Addr{
-				ContextID: contextID,
-				Port:      port,
-			},
-		}
-
-		return nil, c.opError(opDial, err)
+		// No local address, but we have a remote address we can return.
+		return nil, opError(opDial, err, nil, &Addr{
+			ContextID: contextID,
+			Port:      port,
+		})
 	}
 
 	return c, nil
@@ -188,62 +216,10 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.opError(opSet, c.fd.SetDeadline(t, writeDeadline))
 }
 
-// opError unpacks err if possible, producing a net.OpError with op and err in
-// order to implement net.Conn. As a convenience, opError returns nil if the
-// input error is nil.
+// opError is a convenience for the function opError that also passes the local
+// and remote addresses of the Conn.
 func (c *Conn) opError(op string, err error) error {
-	if err == nil {
-		return nil
-	}
-
-	// Unwrap inner errors from error types.
-	//
-	// TODO(mdlayher): errors.Cause or similar in Go 1.13.
-	switch xerr := err.(type) {
-	// os.PathError produced by os.File method calls.
-	case *os.PathError:
-		// Although we could make use of xerr.Op here, we're passing it manually
-		// for consistency, since some of the Conn calls we are making don't
-		// wrap an os.File, which would return an Op for us.
-		err = xerr.Err
-	}
-
-	switch {
-	case isENOTCONN(err):
-		// "transport not connected" means io.EOF in Go.
-		return io.EOF
-	case err == os.ErrClosed, strings.Contains(err.Error(), "use of closed"):
-		// net.TCPConn uses an error with this text from internal/poll for the
-		// backing file already being closed.
-		err = errors.New("use of closed network connection")
-	default:
-		// Nothing to do, return this directly.
-	}
-
-	// Determine source and addr using the rules defined by net.OpError's
-	// documentation: https://golang.org/pkg/net/#OpError.
-	var source, addr net.Addr
-	switch op {
-	case opClose, opDial, opRead, opWrite:
-		if c.local != nil {
-			source = c.local
-		}
-		if c.remote != nil {
-			addr = c.remote
-		}
-	case opSet:
-		if c.local != nil {
-			addr = c.local
-		}
-	}
-
-	return &net.OpError{
-		Op:     op,
-		Net:    network,
-		Source: source,
-		Addr:   addr,
-		Err:    err,
-	}
+	return opError(op, err, c.local, c.remote)
 }
 
 // TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
@@ -291,4 +267,66 @@ func (a *Addr) fileName() string {
 // or VM sockets are unsupported on this system, it returns an error.
 func ContextID() (uint32, error) {
 	return contextID()
+}
+
+// opError unpacks err if possible, producing a net.OpError with the input
+// parameters in order to implement net.Conn. As a convenience, opError returns
+// nil if the input error is nil.
+func opError(op string, err error, local, remote net.Addr) error {
+	if err == nil {
+		return nil
+	}
+
+	// Unwrap inner errors from error types.
+	//
+	// TODO(mdlayher): errors.Cause or similar in Go 1.13.
+	switch xerr := err.(type) {
+	// os.PathError produced by os.File method calls.
+	case *os.PathError:
+		// Although we could make use of xerr.Op here, we're passing it manually
+		// for consistency, since some of the Conn calls we are making don't
+		// wrap an os.File, which would return an Op for us.
+		err = xerr.Err
+	}
+
+	switch {
+	case err == io.EOF, isErrno(err, enotconn):
+		// We may see a literal io.EOF as happens with x/net/nettest, but
+		// "transport not connected" also means io.EOF in Go.
+		return io.EOF
+	case err == os.ErrClosed, isErrno(err, ebadf), strings.Contains(err.Error(), "use of closed"):
+		// Different operations may return different errors that all effectively
+		// indicate a closed file.
+		//
+		// To rectify the differences, net.TCPConn uses an error with this text
+		// from internal/poll for the backing file already being closed.
+		err = errors.New("use of closed network connection")
+	default:
+		// Nothing to do, return this directly.
+	}
+
+	// Determine source and addr using the rules defined by net.OpError's
+	// documentation: https://golang.org/pkg/net/#OpError.
+	var source, addr net.Addr
+	switch op {
+	case opClose, opDial, opRead, opWrite:
+		if local != nil {
+			source = local
+		}
+		if remote != nil {
+			addr = remote
+		}
+	case opAccept, opListen, opSet:
+		if local != nil {
+			addr = local
+		}
+	}
+
+	return &net.OpError{
+		Op:     op,
+		Net:    network,
+		Source: source,
+		Addr:   addr,
+		Err:    err,
+	}
 }

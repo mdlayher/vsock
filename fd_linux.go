@@ -180,9 +180,17 @@ func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
 	}
 }
 
-// isENOTCONN determines if an error is unix.ENOTCONN.
-func isENOTCONN(err error) bool {
-	return err == unix.ENOTCONN
+// isErrno determines if an error a matches UNIX error number.
+func isErrno(err error, errno int) bool {
+	switch errno {
+	case ebadf:
+		return err == unix.EBADF
+	case enotconn:
+		return err == unix.ENOTCONN
+	default:
+		panicf("vsock: isErrno called with unhandled error number parameter: %d", errno)
+		return false
+	}
 }
 
 func panicf(format string, a ...interface{}) {
