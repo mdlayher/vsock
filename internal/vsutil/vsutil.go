@@ -15,7 +15,7 @@ import (
 // If timeout is non-zero, the listener will be closed after the timeout
 // expires, even if no connection was accepted.
 func Accept(l net.Listener, timeout time.Duration) (net.Conn, error) {
-	// This function accomodates both Go1.12+ and Go1.11 functionality to allow
+	// This function accommodates both Go1.12+ and Go1.11 functionality to allow
 	// net.Listener.Accept to be canceled by net.Listener.Close.
 	//
 	// If a timeout is set, set up a timer to close the listener and either:
