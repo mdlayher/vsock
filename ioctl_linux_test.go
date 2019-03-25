@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func Test_localContextIDGuest(t *testing.T) {
+func Test_sysContextIDGuest(t *testing.T) {
 	const (
 		fd        uintptr = 10
 		contextID uint32  = 5

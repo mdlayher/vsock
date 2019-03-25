@@ -22,32 +22,26 @@ func newConn(cfd connFD, local, remote *Addr) (*Conn, error) {
 	}, nil
 }
 
-// dialStream is the entry point for Dial on Linux.
-func dialStream(cid, port uint32) (*Conn, error) {
+// dial is the entry point for Dial on Linux.
+func dial(cid, port uint32) (*Conn, error) {
 	cfd, err := newConnFD()
 	if err != nil {
 		return nil, err
 	}
 
-	return dialStreamLinuxHandleError(cfd, cid, port)
+	return dialLinux(cfd, cid, port)
 }
 
-// dialStreamLinuxHandleError ensures that any errors from dialStreamLinux result
-// in the socket being cleaned up properly.
-func dialStreamLinuxHandleError(cfd connFD, cid, port uint32) (*Conn, error) {
-	c, err := dialStreamLinux(cfd, cid, port)
-	if err != nil {
-		// If any system calls fail during setup, the socket must be closed
-		// early to avoid file descriptor leaks.
-		_ = cfd.EarlyClose()
-		return nil, err
-	}
+// dialLinux is the entry point for tests on Linux.
+func dialLinux(cfd connFD, cid, port uint32) (c *Conn, err error) {
+	defer func() {
+		if err != nil {
+			// If any system calls fail during setup, the socket must be closed
+			// to avoid file descriptor leaks.
+			_ = cfd.EarlyClose()
+		}
+	}()
 
-	return c, nil
-}
-
-// dialStreamLinux is the entry point for tests on Linux.
-func dialStreamLinux(cfd connFD, cid, port uint32) (*Conn, error) {
 	rsa := &unix.SockaddrVM{
 		CID:  cid,
 		Port: port,

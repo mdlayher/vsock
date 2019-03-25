@@ -40,35 +40,29 @@ func (l *listener) Accept() (net.Conn, error) {
 	return newConn(cfd, l.addr, remote)
 }
 
-// listenStream is the entry point for ListenStream on Linux.
-func listenStream(cid, port uint32) (*Listener, error) {
+// listen is the entry point for Listen on Linux.
+func listen(cid, port uint32) (*Listener, error) {
 	lfd, err := newListenFD()
 	if err != nil {
 		return nil, err
 	}
 
-	return listenStreamLinuxHandleError(lfd, cid, port)
-}
-
-// listenStreamLinuxHandleError ensures that any errors from listenStreamLinux
-// result in the socket being cleaned up properly.
-func listenStreamLinuxHandleError(lfd listenFD, cid, port uint32) (*Listener, error) {
-	l, err := listenStreamLinux(lfd, cid, port)
-	if err != nil {
-		// If any system calls fail during setup, the socket must be closed
-		// to avoid file descriptor leaks.
-		_ = lfd.EarlyClose()
-		return nil, err
-	}
-
-	return l, nil
+	return listenLinux(lfd, cid, port)
 }
 
 // TODO(mdlayher): fine-tune this number instead of just picking one.
 const listenBacklog = 32
 
-// listenStreamLinux is the entry point for tests on Linux.
-func listenStreamLinux(lfd listenFD, cid, port uint32) (*Listener, error) {
+// listenLinux is the entry point for tests on Linux.
+func listenLinux(lfd listenFD, cid, port uint32) (l *Listener, err error) {
+	defer func() {
+		if err != nil {
+			// If any system calls fail during setup, the socket must be closed
+			// to avoid file descriptor leaks.
+			_ = lfd.EarlyClose()
+		}
+	}()
+
 	// Zero-value for "any port" is friendlier in Go than a constant.
 	if port == 0 {
 		port = unix.VMADDR_PORT_ANY

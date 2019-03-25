@@ -64,7 +64,7 @@ func Listen(port uint32) (*Listener, error) {
 		return nil, opError(opListen, err, nil, nil)
 	}
 
-	l, err := listenStream(cid, port)
+	l, err := listen(cid, port)
 	if err != nil {
 		// No remote address available.
 		return nil, opError(opListen, err, &Addr{
@@ -132,7 +132,7 @@ func (l *Listener) opError(op string, err error) error {
 //
 // When the connection is no longer needed, Close must be called to free resources.
 func Dial(contextID, port uint32) (*Conn, error) {
-	c, err := dialStream(contextID, port)
+	c, err := dial(contextID, port)
 	if err != nil {
 		// No local address, but we have a remote address we can return.
 		return nil, opError(opDial, err, nil, &Addr{
@@ -232,8 +232,6 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 func (c *Conn) opError(op string, err error) error {
 	return opError(op, err, c.local, c.remote)
 }
-
-// TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 
 var _ net.Addr = &Addr{}
 

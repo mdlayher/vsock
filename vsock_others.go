@@ -16,7 +16,7 @@ var (
 		runtime.GOOS, runtime.GOARCH)
 )
 
-func listenStream(_, _ uint32) (*Listener, error) { return nil, errUnimplemented }
+func listen(_, _ uint32) (*Listener, error) { return nil, errUnimplemented }
 
 type listener struct{}
 
@@ -25,7 +25,7 @@ func (*listener) Addr() net.Addr                { return nil }
 func (*listener) Close() error                  { return errUnimplemented }
 func (*listener) SetDeadline(_ time.Time) error { return errUnimplemented }
 
-func dialStream(_, _ uint32) (*Conn, error) { return nil, errUnimplemented }
+func dial(_, _ uint32) (*Conn, error) { return nil, errUnimplemented }
 
 type connFD struct{}
 

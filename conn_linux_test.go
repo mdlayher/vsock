@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func Test_dialStreamLinuxHandleError(t *testing.T) {
+func Test_dialLinuxErrorClosesFile(t *testing.T) {
 	var closed bool
 	cfd := &testConnFD{
 		// Track when fd.Close is called.
@@ -24,7 +24,7 @@ func Test_dialStreamLinuxHandleError(t *testing.T) {
 		},
 	}
 
-	if _, err := dialStreamLinuxHandleError(cfd, 0, 0); err == nil {
+	if _, err := dialLinux(cfd, 0, 0); err == nil {
 		t.Fatal("expected an error, but none occurred")
 	}
 
@@ -33,7 +33,7 @@ func Test_dialStreamLinuxHandleError(t *testing.T) {
 	}
 }
 
-func Test_dialStreamLinuxFull(t *testing.T) {
+func Test_dialLinuxFull(t *testing.T) {
 	const (
 		localCID  uint32 = 3
 		localPort uint32 = 1024
@@ -94,7 +94,7 @@ func Test_dialStreamLinuxFull(t *testing.T) {
 		},
 	}
 
-	c, err := dialStreamLinux(cfd, remoteCID, remotePort)
+	c, err := dialLinux(cfd, remoteCID, remotePort)
 	if err != nil {
 		t.Fatalf("failed to dial: %v", err)
 	}

@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func Test_listenStreamLinuxHandleError(t *testing.T) {
+func Test_listenLinuxErrorClosesFile(t *testing.T) {
 	var closed bool
 
 	lfd := &testListenFD{
@@ -23,7 +23,7 @@ func Test_listenStreamLinuxHandleError(t *testing.T) {
 		},
 	}
 
-	if _, err := listenStreamLinuxHandleError(lfd, 0, 0); err == nil {
+	if _, err := listenLinux(lfd, 0, 0); err == nil {
 		t.Fatal("expected an error, but none occurred")
 	}
 
@@ -32,7 +32,7 @@ func Test_listenStreamLinuxHandleError(t *testing.T) {
 	}
 }
 
-func Test_listenStreamLinuxPortZero(t *testing.T) {
+func Test_listenLinuxPortZero(t *testing.T) {
 	const (
 		cid  uint32 = Host
 		port uint32 = 0
@@ -57,12 +57,12 @@ func Test_listenStreamLinuxPortZero(t *testing.T) {
 		setNonblocking: func(_ string) error { return nil },
 	}
 
-	if _, err := listenStreamLinux(lfd, cid, port); err != nil {
+	if _, err := listenLinux(lfd, cid, port); err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
 }
 
-func Test_listenStreamLinuxFull(t *testing.T) {
+func Test_listenLinuxFull(t *testing.T) {
 	const (
 		cid  uint32 = Host
 		port uint32 = 1024
@@ -98,7 +98,7 @@ func Test_listenStreamLinuxFull(t *testing.T) {
 		},
 	}
 
-	l, err := listenStreamLinux(lfd, cid, port)
+	l, err := listenLinux(lfd, cid, port)
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}

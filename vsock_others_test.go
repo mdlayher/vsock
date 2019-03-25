@@ -12,13 +12,13 @@ func TestUnimplemented(t *testing.T) {
 			want, got)
 	}
 
-	if _, got := listenStream(0, 0); want != got {
-		t.Fatalf("unexpected error from listenStream:\n- want: %v\n-  got: %v",
+	if _, got := listen(0, 0); want != got {
+		t.Fatalf("unexpected error from listen:\n- want: %v\n-  got: %v",
 			want, got)
 	}
 
-	if _, got := dialStream(0, 0); want != got {
-		t.Fatalf("unexpected error from dialStream:\n- want: %v\n-  got: %v",
+	if _, got := dial(0, 0); want != got {
+		t.Fatalf("unexpected error from dial:\n- want: %v\n-  got: %v",
 			want, got)
 	}
 }
