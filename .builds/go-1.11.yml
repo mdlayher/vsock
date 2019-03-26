@@ -13,8 +13,6 @@ tasks:
   - build: |
       go version
       cd vsock/
-      # temporary: needed only for Go 1.11
-      go mod init
       go get golang.org/x/lint/golint
       go get honnef.co/go/tools/cmd/staticcheck
       /home/build/go/bin/staticcheck ./...
