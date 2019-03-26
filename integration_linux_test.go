@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -103,7 +105,7 @@ func TestIntegrationContextIDHost(t *testing.T) {
 	}
 }
 
-func TestIntegrationNettest(t *testing.T) {
+func TestIntegrationNettestTestConn(t *testing.T) {
 	if vsutil.IsHypervisor(t) {
 		t.Skip("skipping, x/net/nettest vsock integration tests must be run in a guest")
 	}
@@ -115,6 +117,58 @@ func TestIntegrationNettest(t *testing.T) {
 			return vsock.Dial(a.ContextID, a.Port)
 		},
 	))
+}
+
+var cidRe = regexp.MustCompile(`\S+\((\d+)\)`)
+
+func TestIntegrationNettestTestListener(t *testing.T) {
+	if vsutil.IsHypervisor(t) {
+		t.Skip("skipping, x/net/nettest vsock integration tests must be run in a guest")
+	}
+
+	// This test uses the nettest.TestListener API which is being built in:
+	// https://go-review.googlesource.com/c/net/+/123056.
+	//
+	// TODO(mdlayher): stop skipping this test once that CL lands.
+
+	mos := func() (ln net.Listener, dial func(string, string) (net.Conn, error), stop func(), err error) {
+		l, err := vsock.Listen(0)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		stop = func() {
+			// TODO(mdlayher): cancel context if we use vsock.DialContext.
+			_ = l.Close()
+		}
+
+		dial = func(_, addr string) (net.Conn, error) {
+			host, sport, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			// Extract the CID value from the surrounding text.
+			scid := cidRe.FindStringSubmatch(host)
+			cid, err := strconv.Atoi(scid[1])
+			if err != nil {
+				return nil, err
+			}
+
+			port, err := strconv.Atoi(sport)
+			if err != nil {
+				return nil, err
+			}
+
+			return vsock.Dial(uint32(cid), uint32(port))
+		}
+
+		return l, dial, stop, nil
+	}
+
+	_ = mos
+	t.Skip("skipping, enable once https://go-review.googlesource.com/c/net/+/123056 is merged")
+	// nettest.TestListener(t, mos)
 }
 
 func newListener(t *testing.T) (*vsock.Listener, func()) {
