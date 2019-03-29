@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"syscall"
 	"time"
 )
 
@@ -36,6 +37,7 @@ func (*connFD) Read(_ []byte) (int, error)                    { return 0, errUni
 func (*connFD) Write(_ []byte) (int, error)                   { return 0, errUnimplemented }
 func (*connFD) Close() error                                  { return errUnimplemented }
 func (*connFD) Shutdown(_ int) error                          { return errUnimplemented }
+func (*connFD) SyscallConn() (syscall.RawConn, error)         { return nil, errUnimplemented }
 
 func contextID() (uint32, error) { return 0, errUnimplemented }
 
