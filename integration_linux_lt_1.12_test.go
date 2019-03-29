@@ -23,9 +23,7 @@ func TestIntegrationListenerSetDeadlineError(t *testing.T) {
 }
 
 func TestIntegrationConnSyscallConnError(t *testing.T) {
-	if vsutil.IsHypervisor(t) {
-		t.Skip("skipping, this test must be run in a guest")
-	}
+	vsutil.SkipHostIntegration(t)
 
 	mp := makeVSockPipe()
 

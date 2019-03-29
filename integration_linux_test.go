@@ -106,9 +106,7 @@ func TestIntegrationContextIDHost(t *testing.T) {
 }
 
 func TestIntegrationNettestTestConn(t *testing.T) {
-	if vsutil.IsHypervisor(t) {
-		t.Skip("skipping, x/net/nettest vsock integration tests must be run in a guest")
-	}
+	vsutil.SkipHostIntegration(t)
 
 	nettest.TestConn(t, makeVSockPipe())
 }
@@ -116,9 +114,7 @@ func TestIntegrationNettestTestConn(t *testing.T) {
 var cidRe = regexp.MustCompile(`\S+\((\d+)\)`)
 
 func TestIntegrationNettestTestListener(t *testing.T) {
-	if vsutil.IsHypervisor(t) {
-		t.Skip("skipping, x/net/nettest vsock integration tests must be run in a guest")
-	}
+	vsutil.SkipHostIntegration(t)
 
 	// This test uses the nettest.TestListener API which is being built in:
 	// https://go-review.googlesource.com/c/net/+/123056.
