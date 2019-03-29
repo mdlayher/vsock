@@ -62,8 +62,8 @@ func TestIntegrationConnShutdown(t *testing.T) {
 
 	// Perform CloseRead/CloseWrite in lock-step.
 	var (
-		readClosed  = make(chan struct{}, 0)
-		writeClosed = make(chan struct{}, 0)
+		readClosed  = make(chan struct{})
+		writeClosed = make(chan struct{})
 	)
 
 	go func() {
