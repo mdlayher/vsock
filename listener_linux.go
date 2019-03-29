@@ -50,9 +50,6 @@ func listen(cid, port uint32) (*Listener, error) {
 	return listenLinux(lfd, cid, port)
 }
 
-// TODO(mdlayher): fine-tune this number instead of just picking one.
-const listenBacklog = 32
-
 // listenLinux is the entry point for tests on Linux.
 func listenLinux(lfd listenFD, cid, port uint32) (l *Listener, err error) {
 	defer func() {
@@ -77,7 +74,7 @@ func listenLinux(lfd listenFD, cid, port uint32) (l *Listener, err error) {
 		return nil, err
 	}
 
-	if err := lfd.Listen(listenBacklog); err != nil {
+	if err := lfd.Listen(unix.SOMAXCONN); err != nil {
 		return nil, err
 	}
 

@@ -83,7 +83,7 @@ func Test_listenLinuxFull(t *testing.T) {
 			return nil
 		},
 		listen: func(n int) error {
-			if diff := cmp.Diff(listenBacklog, n); diff != "" {
+			if diff := cmp.Diff(unix.SOMAXCONN, n); diff != "" {
 				t.Fatalf("unexpected listen backlog (-want +got):\n%s", diff)
 			}
 
