@@ -3,6 +3,7 @@
 package vsock
 
 import (
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -43,6 +44,7 @@ type testConnFD struct {
 	setNonblocking func(name string) error
 	setDeadline    func(t time.Time, typ deadlineType) error
 	shutdown       func(how int) error
+	syscallConn    func() (syscall.RawConn, error)
 }
 
 func (cfd *testConnFD) Read(b []byte) (int, error)  { return cfd.read(b) }
@@ -58,4 +60,5 @@ func (cfd *testConnFD) SetNonblocking(name string) error    { return cfd.setNonb
 func (cfd *testConnFD) SetDeadline(t time.Time, typ deadlineType) error {
 	return cfd.setDeadline(t, typ)
 }
-func (cfd *testConnFD) Shutdown(how int) error { return cfd.shutdown(how) }
+func (cfd *testConnFD) Shutdown(how int) error                { return cfd.shutdown(how) }
+func (cfd *testConnFD) SyscallConn() (syscall.RawConn, error) { return cfd.syscallConn() }

@@ -3,6 +3,7 @@
 package vsock
 
 import (
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -68,3 +69,5 @@ func (cfd *sysConnFD) shutdown(how int) error {
 
 	return err
 }
+
+func (cfd *sysConnFD) syscallConn() (syscall.RawConn, error) { return cfd.f.SyscallConn() }

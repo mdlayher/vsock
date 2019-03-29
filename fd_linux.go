@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -100,6 +101,7 @@ type connFD interface {
 	Shutdown(how int) error
 	SetNonblocking(name string) error
 	SetDeadline(t time.Time, typ deadlineType) error
+	SyscallConn() (syscall.RawConn, error)
 }
 
 var _ connFD = &sysConnFD{}
@@ -179,6 +181,8 @@ func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
 		return nil
 	}
 }
+
+func (cfd *sysConnFD) SyscallConn() (syscall.RawConn, error) { return cfd.syscallConn() }
 
 // isErrno determines if an error a matches UNIX error number.
 func isErrno(err error, errno int) bool {

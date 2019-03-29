@@ -128,6 +128,32 @@ func Test_opError(t *testing.T) {
 			},
 		},
 		{
+			name:   "op raw-read",
+			op:     opRawRead,
+			err:    errClosed,
+			local:  local,
+			remote: remote,
+			want: &net.OpError{
+				Op:     opRawRead,
+				Source: local,
+				Addr:   remote,
+				Err:    errClosed,
+			},
+		},
+		{
+			name:   "op raw-write",
+			op:     opRawWrite,
+			err:    errClosed,
+			local:  local,
+			remote: remote,
+			want: &net.OpError{
+				Op:     opRawWrite,
+				Source: local,
+				Addr:   remote,
+				Err:    errClosed,
+			},
+		},
+		{
 			name:   "op read",
 			op:     opRead,
 			err:    errClosed,
@@ -176,12 +202,34 @@ func Test_opError(t *testing.T) {
 			},
 		},
 		{
+			name:  "op raw-control",
+			op:    opRawControl,
+			err:   errClosed,
+			local: local,
+			want: &net.OpError{
+				Op:   opRawControl,
+				Addr: local,
+				Err:  errClosed,
+			},
+		},
+		{
 			name:  "op set",
 			op:    opSet,
 			err:   errClosed,
 			local: local,
 			want: &net.OpError{
 				Op:   opSet,
+				Addr: local,
+				Err:  errClosed,
+			},
+		},
+		{
+			name:  "op syscall-conn",
+			op:    opSyscallConn,
+			err:   errClosed,
+			local: local,
+			want: &net.OpError{
+				Op:   opSyscallConn,
 				Addr: local,
 				Err:  errClosed,
 			},

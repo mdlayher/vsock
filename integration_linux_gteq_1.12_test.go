@@ -6,6 +6,10 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/mdlayher/vsock"
+	"github.com/mdlayher/vsock/internal/vsutil"
+	"golang.org/x/sys/unix"
 )
 
 func TestIntegrationListenerUnblockAcceptTimeout(t *testing.T) {
@@ -24,4 +28,51 @@ func TestIntegrationListenerUnblockAcceptTimeout(t *testing.T) {
 	if nerr, ok := err.(net.Error); !ok || (ok && !nerr.Temporary()) {
 		t.Errorf("expected temporary network error, but got: %#v", err)
 	}
+}
+
+func TestIntegrationConnSyscallConn(t *testing.T) {
+	if vsutil.IsHypervisor(t) {
+		t.Skip("skipping, this test must be run in a guest")
+	}
+
+	mp := makeVSockPipe()
+
+	c, _, stop, err := mp()
+	if err != nil {
+		t.Fatalf("failed to make pipe: %v", err)
+	}
+	defer stop()
+
+	rc, err := c.(*vsock.Conn).SyscallConn()
+	if err != nil {
+		t.Fatalf("failed to syscallconn: %v", err)
+	}
+
+	// Greatly reduce the size of the socket buffer.
+	const size uint64 = 64
+
+	err = rc.Control(func(fd uintptr) {
+		const name = unix.SO_VM_SOCKETS_BUFFER_MAX_SIZE
+
+		/*
+			err := unix.SetsockoptUint64(int(fd), unix.AF_VSOCK, name, size)
+			if err != nil {
+				t.Fatalf("failed to setsockopt: %v", err)
+			}
+
+			out, err := unix.GetsockoptUint64(int(fd), unix.AF_VSOCK, name)
+			if err != nil {
+				t.Fatalf("failed to getsockopt: %v", err)
+			}
+
+			if diff := cmp.Diff(size, out); diff != "" {
+				t.Fatalf("unexpected socket buffer size (-want +got):\n%s", diff)
+			}
+		*/
+	})
+	if err != nil {
+		t.Fatalf("failed to control: %v", err)
+	}
+
+	t.Skip("skipping, enable once https://go-review.googlesource.com/c/sys/+/169959 is merged")
 }

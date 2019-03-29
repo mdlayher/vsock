@@ -110,13 +110,7 @@ func TestIntegrationNettestTestConn(t *testing.T) {
 		t.Skip("skipping, x/net/nettest vsock integration tests must be run in a guest")
 	}
 
-	nettest.TestConn(t, makeLocalPipe(
-		func() (net.Listener, error) { return vsock.Listen(0) },
-		func(addr net.Addr) (net.Conn, error) {
-			a := addr.(*vsock.Addr)
-			return vsock.Dial(a.ContextID, a.Port)
-		},
-	))
+	nettest.TestConn(t, makeVSockPipe())
 }
 
 var cidRe = regexp.MustCompile(`\S+\((\d+)\)`)
@@ -190,6 +184,16 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 		timer.Stop()
 		_ = l.Close()
 	}
+}
+
+func makeVSockPipe() nettest.MakePipe {
+	return makeLocalPipe(
+		func() (net.Listener, error) { return vsock.Listen(0) },
+		func(addr net.Addr) (net.Conn, error) {
+			a := addr.(*vsock.Addr)
+			return vsock.Dial(a.ContextID, a.Port)
+		},
+	)
 }
 
 // makeLocalPipe produces a nettest.MakePipe function using the input functions

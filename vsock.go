@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -41,13 +42,17 @@ const (
 	network = "vsock"
 
 	// Operation names which may be returned in net.OpError.
-	opAccept = "accept"
-	opClose  = "close"
-	opDial   = "dial"
-	opListen = "listen"
-	opRead   = "read"
-	opSet    = "set"
-	opWrite  = "write"
+	opAccept      = "accept"
+	opClose       = "close"
+	opDial        = "dial"
+	opListen      = "listen"
+	opRawControl  = "raw-control"
+	opRawRead     = "raw-read"
+	opRawWrite    = "raw-write"
+	opRead        = "read"
+	opSet         = "set"
+	opSyscallConn = "syscall-conn"
+	opWrite       = "write"
 )
 
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
@@ -145,6 +150,7 @@ func Dial(contextID, port uint32) (*Conn, error) {
 }
 
 var _ net.Conn = &Conn{}
+var _ syscall.Conn = &Conn{}
 
 // A Conn is a VM sockets implementation of a net.Conn.
 type Conn struct {
@@ -227,10 +233,56 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.opError(opSet, c.fd.SetDeadline(t, writeDeadline))
 }
 
+// SyscallConn returns a raw network connection. This implements the
+// syscall.Conn interface.
+func (c *Conn) SyscallConn() (syscall.RawConn, error) {
+	rc, err := c.fd.SyscallConn()
+	if err != nil {
+		return nil, c.opError(opSyscallConn, err)
+	}
+
+	return &rawConn{
+		rc:     rc,
+		local:  c.local,
+		remote: c.remote,
+	}, nil
+}
+
 // opError is a convenience for the function opError that also passes the local
 // and remote addresses of the Conn.
 func (c *Conn) opError(op string, err error) error {
 	return opError(op, err, c.local, c.remote)
+}
+
+var _ syscall.RawConn = &rawConn{}
+
+// A rawConn is a syscall.RawConn that wraps an internal syscall.RawConn in order
+// to produce net.OpError error values.
+type rawConn struct {
+	rc     syscall.RawConn
+	local  *Addr
+	remote *Addr
+}
+
+// Control implements the syscall.RawConn Control method.
+func (rc *rawConn) Control(fn func(fd uintptr)) error {
+	return rc.opError(opRawControl, rc.rc.Control(fn))
+}
+
+// Control implements the syscall.RawConn Read method.
+func (rc *rawConn) Read(fn func(fd uintptr) (done bool)) error {
+	return rc.opError(opRawRead, rc.rc.Read(fn))
+}
+
+// Control implements the syscall.RawConn Write method.
+func (rc *rawConn) Write(fn func(fd uintptr) (done bool)) error {
+	return rc.opError(opRawWrite, rc.rc.Write(fn))
+}
+
+// opError is a convenience for the function opError that also passes the local
+// and remote addresses of the rawConn.
+func (rc *rawConn) opError(op string, err error) error {
+	return opError(op, err, rc.local, rc.remote)
 }
 
 var _ net.Addr = &Addr{}
@@ -324,14 +376,14 @@ func opError(op string, err error, local, remote net.Addr) error {
 	// documentation: https://golang.org/pkg/net/#OpError.
 	var source, addr net.Addr
 	switch op {
-	case opClose, opDial, opRead, opWrite:
+	case opClose, opDial, opRawRead, opRawWrite, opRead, opWrite:
 		if local != nil {
 			source = local
 		}
 		if remote != nil {
 			addr = remote
 		}
-	case opAccept, opListen, opSet:
+	case opAccept, opListen, opRawControl, opSet, opSyscallConn:
 		if local != nil {
 			addr = local
 		}

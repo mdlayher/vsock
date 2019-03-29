@@ -5,6 +5,7 @@ package vsock
 import (
 	"fmt"
 	"runtime"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -26,4 +27,9 @@ func (*sysListenFD) setDeadline(_ time.Time) error {
 func (*sysConnFD) shutdown(_ int) error {
 	// Shutdown functionality is not available in this version on Go.
 	return fmt.Errorf("vsock: close conn read/write not supported on %s", runtime.Version())
+}
+
+func (*sysConnFD) syscallConn() (syscall.RawConn, error) {
+	// SyscallConn functionality is not available in this version on Go.
+	return nil, fmt.Errorf("vsock: syscall conn not supported on %s", runtime.Version())
 }

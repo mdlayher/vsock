@@ -4,6 +4,7 @@ package vsock
 
 import (
 	"errors"
+	"syscall"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -56,6 +57,7 @@ func Test_dialLinuxFull(t *testing.T) {
 		closed      bool
 		closedRead  bool
 		closedWrite bool
+		syscallConn bool
 	)
 
 	cfd := &testConnFD{
@@ -92,6 +94,11 @@ func Test_dialLinuxFull(t *testing.T) {
 
 			return nil
 		},
+		syscallConn: func() (syscall.RawConn, error) {
+			// No need to really do anything.
+			syscallConn = true
+			return nil, nil
+		},
 	}
 
 	c, err := dialLinux(cfd, remoteCID, remotePort)
@@ -115,6 +122,14 @@ func Test_dialLinuxFull(t *testing.T) {
 
 	if diff := cmp.Diff(remoteAddr, c.RemoteAddr()); diff != "" {
 		t.Fatalf("unexpected remote address (-want +got):\n%s", diff)
+	}
+
+	if _, err := c.SyscallConn(); err != nil {
+		t.Fatalf("failed to test syscall conn: %v", err)
+	}
+
+	if !syscallConn {
+		t.Fatal("expected call to SyscallConn, but none occurred")
 	}
 
 	// Verify Close/Shutdown plumbing.
