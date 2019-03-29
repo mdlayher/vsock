@@ -26,6 +26,7 @@
 //     - SetDeadline family of methods are fully supported
 //     - CloseRead and CloseWrite can close the reading or writing sides of a
 //       Conn, respectively
+//     - SyscallConn provides access to raw network control/read/write functionality
 //
 // Go 1.11 (not recommended):
 //   - *Listener:
@@ -37,6 +38,7 @@
 //   - *Conn:
 //     - SetDeadline family of methods are fully supported
 //     - CloseRead and CloseWrite are not supported and will always return an error
+//     - SyscallConn is not supported and will always return an error
 //
 // Go 1.10 and below are not supported. The runtime network poller integration
 // required by this package is not available in Go versions prior to Go 1.11.
