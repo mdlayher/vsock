@@ -9,7 +9,6 @@ import (
 
 	"github.com/mdlayher/vsock"
 	"github.com/mdlayher/vsock/internal/vsutil"
-	"golang.org/x/sys/unix"
 )
 
 func TestIntegrationListenerUnblockAcceptTimeout(t *testing.T) {
@@ -49,11 +48,14 @@ func TestIntegrationConnSyscallConn(t *testing.T) {
 	}
 
 	// Greatly reduce the size of the socket buffer.
-	const size uint64 = 64
+	/*
+		const (
+			size uint64 = 64
+			name        = unix.SO_VM_SOCKETS_BUFFER_MAX_SIZE
+		)
+	*/
 
 	err = rc.Control(func(fd uintptr) {
-		const name = unix.SO_VM_SOCKETS_BUFFER_MAX_SIZE
-
 		/*
 			err := unix.SetsockoptUint64(int(fd), unix.AF_VSOCK, name, size)
 			if err != nil {
