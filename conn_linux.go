@@ -1,4 +1,4 @@
-//+build linux
+//+build go1.11,linux
 
 package vsock
 
