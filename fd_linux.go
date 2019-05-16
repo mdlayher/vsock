@@ -45,7 +45,7 @@ type sysListenFD struct {
 
 // newListenFD creates a sysListenFD in its default blocking mode.
 func newListenFD() (*sysListenFD, error) {
-	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	fd, err := socket()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ var _ connFD = &sysConnFD{}
 
 // newConnFD creates a sysConnFD in its default blocking mode.
 func newConnFD() (*sysConnFD, error) {
-	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	fd, err := socket()
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +194,46 @@ func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
 }
 
 func (cfd *sysConnFD) SyscallConn() (syscall.RawConn, error) { return cfd.syscallConn() }
+
+// socket invokes unix.Socket with the correct arguments to produce a vsock
+// file descriptor.
+func socket() (int, error) {
+	// "Mirror what the standard library does when creating file
+	// descriptors: avoid racing a fork/exec with the creation
+	// of new file descriptors, so that child processes do not
+	// inherit [socket] file descriptors unexpectedly.
+	//
+	// On Linux, SOCK_CLOEXEC was introduced in 2.6.27. OTOH,
+	// Go supports Linux 2.6.23 and above. If we get EINVAL on
+	// the first try, it may be that we are running on a kernel
+	// older than 2.6.27. In that case, take syscall.ForkLock
+	// and try again without SOCK_CLOEXEC.
+	//
+	// For a more thorough explanation, see similar work in the
+	// Go tree: func sysSocket in net/sock_cloexec.go, as well
+	// as the detailed comment in syscall/exec_unix.go."
+	//
+	// Explanation copied from netlink, courtesy of acln:
+	// https://github.com/mdlayher/netlink/pull/138.
+	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
+	switch err {
+	case nil:
+		return fd, nil
+	case unix.EINVAL:
+		syscall.ForkLock.RLock()
+		defer syscall.ForkLock.RUnlock()
+
+		fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+		if err != nil {
+			return 0, err
+		}
+		unix.CloseOnExec(fd)
+
+		return fd, nil
+	default:
+		return 0, err
+	}
+}
 
 // isErrno determines if an error a matches UNIX error number.
 func isErrno(err error, errno int) bool {
