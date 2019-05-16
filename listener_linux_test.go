@@ -125,7 +125,7 @@ func Test_listenerAccept(t *testing.T) {
 
 	var nonblocking bool
 	accept4Fn := func(flags int) (connFD, unix.Sockaddr, error) {
-		if diff := cmp.Diff(0, flags); diff != "" {
+		if diff := cmp.Diff(unix.SOCK_CLOEXEC, flags); diff != "" {
 			t.Fatalf("unexpected accept4 flags (-want +got):\n%s", diff)
 		}
 
