@@ -1,0 +1,21 @@
+image: archlinux
+packages:
+  - wget
+sources:
+  - https://github.com/mdlayher/vsock
+environment:
+  GO111MODULE: "on"
+tasks:
+  - install: |
+      wget -q https://dl.google.com/go/go1.10.8.linux-amd64.tar.gz
+      sudo tar -C /usr/local -xzf go1.10.8.linux-amd64.tar.gz
+      sudo ln -s /usr/local/go/bin/go /usr/bin/go
+  - build: |
+      go version
+      cd vsock/
+      go get golang.org/x/lint/golint
+      /home/build/go/bin/golint -set_exit_status ./...
+      # Enable access to the vsock device for tests.
+      sudo modprobe vhost_vsock
+      sudo chmod 666 /dev/vsock
+      go test -v -race ./...
