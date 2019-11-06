@@ -12,7 +12,7 @@ This package supports varying levels of functionality depending on the version
 of Go used during compilation. The `Listener` and `Conn` types produced by this
 package are backed by non-blocking I/O, in order to integrate with Go's runtime
 network poller in Go 1.11+. Additional functionality is available starting in Go
-1.12+. Go 1.10 and prior versions of Go **are not supported**.
+1.12+. The older Go 1.10 is only supported in a blocking-only mode.
 
 A comprehensive list of functionality for supported Go versions can be found on
 [package vsock's GoDoc page](https://godoc.org/github.com/mdlayher/vsock#hdr-Go_version_support).
