@@ -42,8 +42,6 @@
 //
 // Go 1.10 and below are not supported. The runtime network poller integration
 // required by this package is not available in Go versions prior to Go 1.11.
-// Unsupported versions of Go will produce a compilation error when trying to
-// build this package.
 //
 // Stability
 //
