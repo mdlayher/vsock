@@ -1,9 +1,10 @@
-//+build !go1.12,linux
+//+build go1.11,!go1.12,linux
 
 package vsock
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"syscall"
 	"time"
@@ -16,6 +17,19 @@ func (lfd *sysListenFD) accept4(flags int) (int, unix.Sockaddr, error) {
 	// may be attached to the runtime network poller, forcing this call to block
 	// even if Close is called.
 	return unix.Accept4(lfd.fd, flags)
+}
+
+func (lfd *sysListenFD) setNonblocking(name string) error {
+	// From now on, we must perform non-blocking I/O, so that our
+	// net.Listener.Accept method can be interrupted by closing the socket.
+	if err := unix.SetNonblock(lfd.fd, true); err != nil {
+		return err
+	}
+
+	// Transition from blocking mode to non-blocking mode.
+	lfd.f = os.NewFile(uintptr(lfd.fd), name)
+
+	return nil
 }
 
 func (*sysListenFD) setDeadline(_ time.Time) error {
@@ -32,4 +46,17 @@ func (*sysConnFD) shutdown(_ int) error {
 func (*sysConnFD) syscallConn() (syscall.RawConn, error) {
 	// SyscallConn functionality is not available in this version on Go.
 	return nil, fmt.Errorf("vsock: syscall conn not supported on %s", runtime.Version())
+}
+
+func (cfd *sysConnFD) setNonblocking(name string) error {
+	// From now on, we must perform non-blocking I/O, so that our deadline
+	// methods work, and the connection can be interrupted by net.Conn.Close.
+	if err := unix.SetNonblock(cfd.fd, true); err != nil {
+		return err
+	}
+
+	// Transition from blocking mode to non-blocking mode.
+	cfd.f = os.NewFile(uintptr(cfd.fd), name)
+
+	return nil
 }
