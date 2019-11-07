@@ -162,17 +162,7 @@ func (cfd *sysConnFD) Shutdown(how int) error {
 }
 
 func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
-	switch typ {
-	case deadline:
-		return cfd.f.SetDeadline(t)
-	case readDeadline:
-		return cfd.f.SetReadDeadline(t)
-	case writeDeadline:
-		return cfd.f.SetWriteDeadline(t)
-	default:
-		panicf("vsock: sysConnFD.SetDeadline method invoked with invalid deadline type constant: %d", typ)
-		return nil
-	}
+	return cfd.setDeadline(t, typ)
 }
 
 func (cfd *sysConnFD) SyscallConn() (syscall.RawConn, error) { return cfd.syscallConn() }

@@ -56,3 +56,8 @@ func (cfd *sysConnFD) setNonblocking(name string) error {
 
 	return nil
 }
+
+func (cfd *sysConnFD) setDeadline(t time.Time, typ deadlineType) error {
+	// Deadline functionality is not available in this version on Go.
+	return fmt.Errorf("vsock: connection deadlines not supported on %s", runtime.Version())
+}

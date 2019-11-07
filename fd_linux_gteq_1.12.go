@@ -96,3 +96,17 @@ func (cfd *sysConnFD) setNonblocking(name string) error {
 
 	return nil
 }
+
+func (cfd *sysConnFD) setDeadline(t time.Time, typ deadlineType) error {
+	switch typ {
+	case deadline:
+		return cfd.f.SetDeadline(t)
+	case readDeadline:
+		return cfd.f.SetReadDeadline(t)
+	case writeDeadline:
+		return cfd.f.SetWriteDeadline(t)
+	}
+
+	panicf("vsock: sysConnFD.SetDeadline method invoked with invalid deadline type constant: %d", typ)
+	return nil
+}
