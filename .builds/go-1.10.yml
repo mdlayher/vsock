@@ -3,8 +3,6 @@ packages:
   - wget
 sources:
   - https://github.com/mdlayher/vsock
-environment:
-  GO111MODULE: "on"
 tasks:
   - install: |
       wget -q https://dl.google.com/go/go1.10.8.linux-amd64.tar.gz
@@ -12,7 +10,11 @@ tasks:
       sudo ln -s /usr/local/go/bin/go /usr/bin/go
   - build: |
       go version
-      cd vsock/
+      # Force build in GOPATH mode because Go 1.10 doesn't support modules.
+      mkdir -p  /home/build/go/src/github.com/mdlayher/
+      mv vsock /home/build/go/src/github.com/mdlayher/
+      cd /home/build/go/src/github.com/mdlayher/vsock
+      go get -d -t -v ./...
       go get golang.org/x/lint/golint
       /home/build/go/bin/golint -set_exit_status ./...
       # Enable access to the vsock device for tests.
