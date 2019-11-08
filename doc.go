@@ -43,8 +43,7 @@
 // Go 1.10 (not recommended):
 //   - *Listener:
 //     - Accept blocks until a connection is received
-//       CPU cycle consumption
-//     - Close makes Accept return a permanent error on the next loop iteration
+//     - Close cannot unblock Accept
 //     - SetDeadline is not supported and will always return an error
 //   - *Conn:
 //     - SetDeadline is not supported and will always return an error
