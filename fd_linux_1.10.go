@@ -1,9 +1,10 @@
-//+build !go1.12,linux
+//+build go1.10,!go1.11,linux
 
 package vsock
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"syscall"
 	"time"
@@ -16,6 +17,17 @@ func (lfd *sysListenFD) accept4(flags int) (int, unix.Sockaddr, error) {
 	// may be attached to the runtime network poller, forcing this call to block
 	// even if Close is called.
 	return unix.Accept4(lfd.fd, flags)
+}
+
+func (lfd *sysListenFD) setNonblocking(name string) error {
+	// Go 1.10 doesn't support non-blocking I/O.
+	if err := unix.SetNonblock(lfd.fd, false); err != nil {
+		return err
+	}
+
+	lfd.f = os.NewFile(uintptr(lfd.fd), name)
+
+	return nil
 }
 
 func (*sysListenFD) setDeadline(_ time.Time) error {
@@ -32,4 +44,20 @@ func (*sysConnFD) shutdown(_ int) error {
 func (*sysConnFD) syscallConn() (syscall.RawConn, error) {
 	// SyscallConn functionality is not available in this version on Go.
 	return nil, fmt.Errorf("vsock: syscall conn not supported on %s", runtime.Version())
+}
+
+func (cfd *sysConnFD) setNonblocking(name string) error {
+	// Go 1.10 doesn't support non-blocking I/O.
+	if err := unix.SetNonblock(cfd.fd, false); err != nil {
+		return err
+	}
+
+	cfd.f = os.NewFile(uintptr(cfd.fd), name)
+
+	return nil
+}
+
+func (cfd *sysConnFD) setDeadline(t time.Time, typ deadlineType) error {
+	// Deadline functionality is not available in this version on Go.
+	return fmt.Errorf("vsock: connection deadlines not supported on %s", runtime.Version())
 }

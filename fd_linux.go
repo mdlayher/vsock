@@ -62,16 +62,7 @@ func (lfd *sysListenFD) Getsockname() (unix.Sockaddr, error) { return unix.Getso
 func (lfd *sysListenFD) Listen(n int) error                  { return unix.Listen(lfd.fd, n) }
 
 func (lfd *sysListenFD) SetNonblocking(name string) error {
-	// From now on, we must perform non-blocking I/O, so that our
-	// net.Listener.Accept method can be interrupted by closing the socket.
-	if err := unix.SetNonblock(lfd.fd, true); err != nil {
-		return err
-	}
-
-	// Transition from blocking mode to non-blocking mode.
-	lfd.f = os.NewFile(uintptr(lfd.fd), name)
-
-	return nil
+	return lfd.setNonblocking(name)
 }
 
 // EarlyClose is a blocking version of Close, only used for cleanup before
@@ -146,16 +137,7 @@ func (cfd *sysConnFD) Getsockname() (unix.Sockaddr, error) { return unix.Getsock
 func (cfd *sysConnFD) EarlyClose() error { return unix.Close(cfd.fd) }
 
 func (cfd *sysConnFD) SetNonblocking(name string) error {
-	// From now on, we must perform non-blocking I/O, so that our deadline
-	// methods work, and the connection can be interrupted by net.Conn.Close.
-	if err := unix.SetNonblock(cfd.fd, true); err != nil {
-		return err
-	}
-
-	// Transition from blocking mode to non-blocking mode.
-	cfd.f = os.NewFile(uintptr(cfd.fd), name)
-
-	return nil
+	return cfd.setNonblocking(name)
 }
 
 // Non-blocking mode methods.
@@ -180,17 +162,7 @@ func (cfd *sysConnFD) Shutdown(how int) error {
 }
 
 func (cfd *sysConnFD) SetDeadline(t time.Time, typ deadlineType) error {
-	switch typ {
-	case deadline:
-		return cfd.f.SetDeadline(t)
-	case readDeadline:
-		return cfd.f.SetReadDeadline(t)
-	case writeDeadline:
-		return cfd.f.SetWriteDeadline(t)
-	default:
-		panicf("vsock: sysConnFD.SetDeadline method invoked with invalid deadline type constant: %d", typ)
-		return nil
-	}
+	return cfd.setDeadline(t, typ)
 }
 
 func (cfd *sysConnFD) SyscallConn() (syscall.RawConn, error) { return cfd.syscallConn() }
