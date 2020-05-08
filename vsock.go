@@ -149,6 +149,20 @@ func Dial(contextID, port uint32) (*Conn, error) {
 	return c, nil
 }
 
+// DialTimeout acts like Dial but takes a timeout.
+func DialTimeout(contextID, port uint32, timeout time.Duration) (*Conn, error) {
+	c, err := dialTimeout(contextID, port, timeout)
+	if err != nil {
+		// No local address, but we have a remote address we can return.
+		return nil, opError(opDial, err, nil, &Addr{
+			ContextID: contextID,
+			Port:      port,
+		})
+	}
+
+	return c, nil
+}
+
 var _ net.Conn = &Conn{}
 var _ syscall.Conn = &Conn{}
 
