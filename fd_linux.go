@@ -187,23 +187,28 @@ func socket() (int, error) {
 	//
 	// Explanation copied from netlink, courtesy of acln:
 	// https://github.com/mdlayher/netlink/pull/138.
-	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
-	switch err {
-	case nil:
-		return fd, nil
-	case unix.EINVAL:
-		syscall.ForkLock.RLock()
-		defer syscall.ForkLock.RUnlock()
+	for {
+		fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
+		switch err {
+		case nil:
+			return fd, nil
+		case unix.EINTR:
+			// Retry on interrupted syscalls.
+			continue
+		case unix.EINVAL:
+			syscall.ForkLock.RLock()
+			defer syscall.ForkLock.RUnlock()
 
-		fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
-		if err != nil {
+			fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+			if err != nil {
+				return 0, err
+			}
+			unix.CloseOnExec(fd)
+
+			return fd, nil
+		default:
 			return 0, err
 		}
-		unix.CloseOnExec(fd)
-
-		return fd, nil
-	default:
-		return 0, err
 	}
 }
 
