@@ -207,3 +207,38 @@ func makeLocalPipe(
 		}
 	}
 }
+
+func makeVSockPipeWithTimeout(timeout time.Duration) nettest.MakePipe {
+	return makeLocalPipe(
+		func() (net.Listener, error) { return vsock.Listen(0) },
+		func(addr net.Addr) (net.Conn, error) {
+			a := addr.(*vsock.Addr)
+			return vsock.DialTimeout(a.ContextID, a.Port, timeout)
+		},
+	)
+}
+
+func TestIntegrationConnTimeout(t *testing.T) {
+	vsutil.SkipHostIntegration(t)
+
+	timer := time.AfterFunc(10*time.Second, func() {
+		panic("test took too long")
+	})
+	defer timer.Stop()
+
+	mp0 := makeVSockPipeWithTimeout(time.Microsecond)
+	_, _, stop0, err0 := mp0()
+	if err0 == nil {
+		defer stop0()
+	}
+	if !os.IsTimeout(err0) {
+		t.Fatalf("connect with a very short dial timeout expect `ETIMEDOUT`, but got %v", err0)
+	}
+
+	mp1 := makeVSockPipeWithTimeout(time.Second * 2)
+	_, _, stop1, err1 := mp1()
+	if err1 != nil {
+		t.Fatalf("failed to make pipe: %v", err1)
+	}
+	defer stop1()
+}

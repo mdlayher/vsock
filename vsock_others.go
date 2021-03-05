@@ -26,7 +26,8 @@ func (*listener) Addr() net.Addr                { return nil }
 func (*listener) Close() error                  { return errUnimplemented }
 func (*listener) SetDeadline(_ time.Time) error { return errUnimplemented }
 
-func dial(_, _ uint32) (*Conn, error) { return nil, errUnimplemented }
+func dial(_, _ uint32) (*Conn, error)                         { return nil, errUnimplemented }
+func dialTimeout(_, _ uint32, _ time.Duration) (*Conn, error) { return nil, errUnimplemented }
 
 type connFD struct{}
 

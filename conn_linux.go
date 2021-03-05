@@ -3,6 +3,8 @@
 package vsock
 
 import (
+	"time"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -25,6 +27,22 @@ func newConn(cfd connFD, local, remote *Addr) (*Conn, error) {
 // dial is the entry point for Dial on Linux.
 func dial(cid, port uint32) (*Conn, error) {
 	cfd, err := newConnFD()
+	if err != nil {
+		return nil, err
+	}
+
+	return dialLinux(cfd, cid, port)
+}
+
+// dialTimeout acts like dial but takes a timeout.
+func dialTimeout(cid, port uint32, timeout time.Duration) (*Conn, error) {
+	cfd, err := newConnFD()
+	if err != nil {
+		return nil, err
+	}
+
+	tv := unix.NsecToTimeval(timeout.Nanoseconds())
+	err = unix.SetsockoptTimeval(cfd.fd, unix.AF_VSOCK, unix.SO_VM_SOCKETS_CONNECT_TIMEOUT, &tv)
 	if err != nil {
 		return nil, err
 	}
