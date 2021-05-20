@@ -20,9 +20,8 @@ const (
 	// the hypervisor on the host machine.
 	Host = 0x2
 
-	// cidReserved is a reserved context ID that is no longer in use,
-	// and cannot be used for socket communications.
-	cidReserved = 0x1
+	// loopback is used for local communication.
+	loopback = 0x1
 
 	// shutRd and shutWr are arguments for unix.Shutdown, copied here to avoid
 	// importing x/sys/unix in cross-platform code.
@@ -74,6 +73,21 @@ func Listen(port uint32) (*Listener, error) {
 		// No remote address available.
 		return nil, opError(opListen, err, &Addr{
 			ContextID: cid,
+			Port:      port,
+		}, nil)
+	}
+
+	return l, nil
+}
+
+// ListenLocal works the same way as Listen except it uses VMADDR_CID_LOCAL(1)
+// to allow local testing via loopback, e.g. without spinning up a VM.
+func ListenLocal(port uint32) (*Listener, error) {
+	l, err := listen(loopback, port)
+	if err != nil {
+		// No remote address available.
+		return nil, opError(opListen, err, &Addr{
+			ContextID: 1,
 			Port:      port,
 		}, nil)
 	}
@@ -304,8 +318,8 @@ func (a *Addr) String() string {
 	switch a.ContextID {
 	case Hypervisor:
 		host = fmt.Sprintf("hypervisor(%d)", a.ContextID)
-	case cidReserved:
-		host = fmt.Sprintf("reserved(%d)", a.ContextID)
+	case loopback:
+		host = fmt.Sprintf("loopback(%d)", a.ContextID)
 	case Host:
 		host = fmt.Sprintf("host(%d)", a.ContextID)
 	default:
