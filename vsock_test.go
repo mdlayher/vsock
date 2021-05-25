@@ -1,6 +1,10 @@
 package vsock
 
 import (
+	"bytes"
+	"fmt"
+	"math/rand"
+	"sync"
 	"testing"
 )
 
@@ -16,9 +20,9 @@ func TestAddr_fileName(t *testing.T) {
 			s:    "vsock:hypervisor(0):10",
 		},
 		{
-			cid:  cidReserved,
+			cid:  loopback,
 			port: 20,
-			s:    "vsock:reserved(1):20",
+			s:    "vsock:loopback(1):20",
 		},
 		{
 			cid:  Host,
@@ -45,4 +49,73 @@ func TestAddr_fileName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestListenLocal(t *testing.T) {
+	const listenPort = 1025
+
+	var	testData = make([]byte, 1024)
+	_, err := rand.Read(testData)
+	if err != nil {
+		t.Fatalf("unable to prepare test data: %v", err)
+	}
+
+	// server must listen before client dial
+	listener, err := ListenLocal(listenPort)
+	if err != nil {
+		t.Fatalf("unable to listen on local CID: %v", err)
+	}
+	defer listener.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	errChan := make(chan string, 2)
+	go func() {
+		defer wg.Done()
+
+		conn, err := listener.Accept()
+		if err != nil {
+			errChan <- fmt.Sprintf("unable to accept on local CID: %v",  err)
+			return
+		}
+		defer conn.Close()
+
+		data := make([]byte, 1024)
+		_, err = conn.Read(data)
+		if err != nil {
+			errChan <- fmt.Sprintf("unable to read on local CID: %v",  err)
+			return
+		}
+
+		if !bytes.Equal(data, testData) {
+			errChan <- fmt.Sprintf("read corrupted on local CID: %v",  err)
+			return
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		conn, err := Dial(loopback, listenPort)
+		if err != nil {
+			errChan <- fmt.Sprintf("unable to dial local CID(%d): %v", loopback, err)
+			return
+		}
+		defer conn.Close()
+
+		_, err = conn.Write(testData)
+		if err != nil {
+			errChan <- fmt.Sprintf("unable to write to local CID: %v",  err)
+			return
+		}
+	}()
+
+	wg.Wait()
+
+	select {
+	case err := <- errChan:
+		t.Fatal(err)
+	default:
+	}
+
 }
