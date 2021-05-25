@@ -87,7 +87,7 @@ func ListenLocal(port uint32) (*Listener, error) {
 	if err != nil {
 		// No remote address available.
 		return nil, opError(opListen, err, &Addr{
-			ContextID: 1,
+			ContextID: loopback,
 			Port:      port,
 		}, nil)
 	}
