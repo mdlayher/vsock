@@ -96,7 +96,7 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 
 	logf("opening listener: %d", port)
 
-	l, err := vsock.Listen(port)
+	l, err := vsock.Listen(0, port)
 	if err != nil {
 		fatalf("failed to listen: %v", err)
 	}

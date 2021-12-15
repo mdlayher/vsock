@@ -16,13 +16,13 @@ const (
 	// process.
 	Hypervisor = 0x0
 
+	// Loopback specifies that a socket should communicate with a matching
+	// socket on the same machine.
+	Loopback = 0x01
+
 	// Host specifies that a socket should communicate with processes other than
 	// the hypervisor on the host machine.
 	Host = 0x2
-
-	// cidReserved is a reserved context ID that is no longer in use,
-	// and cannot be used for socket communications.
-	cidReserved = 0x1
 
 	// shutRd and shutWr are arguments for unix.Shutdown, copied here to avoid
 	// importing x/sys/unix in cross-platform code.
@@ -58,15 +58,22 @@ const (
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
 // connections. The port parameter specifies the port for the Listener.
 //
+// TODO(mdlayher): document cid!
+//
 // To allow the server to assign a port automatically, specify 0 for port.
 // The address of the server can be retrieved using the Addr method.
 //
 // When the Listener is no longer needed, Close must be called to free resources.
-func Listen(port uint32) (*Listener, error) {
-	cid, err := ContextID()
-	if err != nil {
-		// No addresses available.
-		return nil, opError(opListen, err, nil, nil)
+func Listen(cid, port uint32) (*Listener, error) {
+	// TODO(mdlayher): resolve hypervisor versus default ambiguities before
+	// committing to this new API.
+	if cid == 0 {
+		var err error
+		cid, err = ContextID()
+		if err != nil {
+			// No addresses available.
+			return nil, opError(opListen, err, nil, nil)
+		}
 	}
 
 	l, err := listen(cid, port)
@@ -304,8 +311,8 @@ func (a *Addr) String() string {
 	switch a.ContextID {
 	case Hypervisor:
 		host = fmt.Sprintf("hypervisor(%d)", a.ContextID)
-	case cidReserved:
-		host = fmt.Sprintf("reserved(%d)", a.ContextID)
+	case Loopback:
+		host = fmt.Sprintf("loopback(%d)", a.ContextID)
 	case Host:
 		host = fmt.Sprintf("host(%d)", a.ContextID)
 	default:

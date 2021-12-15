@@ -1,4 +1,5 @@
-//+build linux
+//go:build linux
+// +build linux
 
 package vsock_test
 
@@ -70,7 +71,7 @@ func TestIntegrationNettestTestListener(t *testing.T) {
 	// TODO(mdlayher): stop skipping this test once that CL lands.
 
 	mos := func() (ln net.Listener, dial func(string, string) (net.Conn, error), stop func(), err error) {
-		l, err := vsock.Listen(0)
+		l, err := vsock.Listen(vsock.Loopback, 0)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -116,7 +117,7 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 		panic("test took too long")
 	})
 
-	l, err := vsock.Listen(0)
+	l, err := vsock.Listen(0x01, 0)
 	if err != nil {
 		vsutil.SkipDeviceError(t, err)
 
@@ -132,7 +133,7 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 
 func makeVSockPipe() nettest.MakePipe {
 	return makeLocalPipe(
-		func() (net.Listener, error) { return vsock.Listen(0) },
+		func() (net.Listener, error) { return vsock.Listen(0x01, 0) },
 		func(addr net.Addr) (net.Conn, error) {
 			a := addr.(*vsock.Addr)
 			return vsock.Dial(a.ContextID, a.Port)

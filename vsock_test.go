@@ -16,9 +16,9 @@ func TestAddr_fileName(t *testing.T) {
 			s:    "vsock:hypervisor(0):10",
 		},
 		{
-			cid:  cidReserved,
+			cid:  Loopback,
 			port: 20,
-			s:    "vsock:reserved(1):20",
+			s:    "vsock:loopback(1):20",
 		},
 		{
 			cid:  Host,
