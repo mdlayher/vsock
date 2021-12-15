@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/mdlayher/socket"
 )
 
 const (
@@ -119,8 +121,6 @@ func (l *Listener) Close() error {
 
 // SetDeadline sets the deadline associated with the listener. A zero time value
 // disables the deadline.
-//
-// SetDeadline only works with Go 1.12+.
 func (l *Listener) SetDeadline(t time.Time) error {
 	return l.opError(opSet, l.l.SetDeadline(t))
 }
@@ -161,30 +161,26 @@ var _ syscall.Conn = &Conn{}
 
 // A Conn is a VM sockets implementation of a net.Conn.
 type Conn struct {
-	fd     connFD
+	c      *socket.Conn
 	local  *Addr
 	remote *Addr
 }
 
 // Close closes the connection.
 func (c *Conn) Close() error {
-	return c.opError(opClose, c.fd.Close())
+	return c.opError(opClose, c.c.Close())
 }
 
 // CloseRead shuts down the reading side of the VM sockets connection. Most
 // callers should just use Close.
-//
-// CloseRead only works with Go 1.12+.
 func (c *Conn) CloseRead() error {
-	return c.opError(opClose, c.fd.Shutdown(shutRd))
+	return c.opError(opClose, c.c.Shutdown(shutRd))
 }
 
 // CloseWrite shuts down the writing side of the VM sockets connection. Most
 // callers should just use Close.
-//
-// CloseWrite only works with Go 1.12+.
 func (c *Conn) CloseWrite() error {
-	return c.opError(opClose, c.fd.Shutdown(shutWr))
+	return c.opError(opClose, c.c.Shutdown(shutWr))
 }
 
 // LocalAddr returns the local network address. The Addr returned is shared by
@@ -197,7 +193,7 @@ func (c *Conn) RemoteAddr() net.Addr { return c.remote }
 
 // Read implements the net.Conn Read method.
 func (c *Conn) Read(b []byte) (int, error) {
-	n, err := c.fd.Read(b)
+	n, err := c.c.Read(b)
 	if err != nil {
 		return n, c.opError(opRead, err)
 	}
@@ -207,7 +203,7 @@ func (c *Conn) Read(b []byte) (int, error) {
 
 // Write implements the net.Conn Write method.
 func (c *Conn) Write(b []byte) (int, error) {
-	n, err := c.fd.Write(b)
+	n, err := c.c.Write(b)
 	if err != nil {
 		return n, c.opError(opWrite, err)
 	}
@@ -215,35 +211,25 @@ func (c *Conn) Write(b []byte) (int, error) {
 	return n, nil
 }
 
-// A deadlineType specifies the type of deadline to set for a Conn.
-type deadlineType int
-
-// Possible deadlineType values.
-const (
-	deadline deadlineType = iota
-	readDeadline
-	writeDeadline
-)
-
 // SetDeadline implements the net.Conn SetDeadline method.
 func (c *Conn) SetDeadline(t time.Time) error {
-	return c.opError(opSet, c.fd.SetDeadline(t, deadline))
+	return c.opError(opSet, c.c.SetDeadline(t))
 }
 
 // SetReadDeadline implements the net.Conn SetReadDeadline method.
 func (c *Conn) SetReadDeadline(t time.Time) error {
-	return c.opError(opSet, c.fd.SetDeadline(t, readDeadline))
+	return c.opError(opSet, c.c.SetReadDeadline(t))
 }
 
 // SetWriteDeadline implements the net.Conn SetWriteDeadline method.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
-	return c.opError(opSet, c.fd.SetDeadline(t, writeDeadline))
+	return c.opError(opSet, c.c.SetWriteDeadline(t))
 }
 
 // SyscallConn returns a raw network connection. This implements the
 // syscall.Conn interface.
 func (c *Conn) SyscallConn() (syscall.RawConn, error) {
-	rc, err := c.fd.SyscallConn()
+	rc, err := c.c.SyscallConn()
 	if err != nil {
 		return nil, c.opError(opSyscallConn, err)
 	}
@@ -266,9 +252,8 @@ var _ syscall.RawConn = &rawConn{}
 // A rawConn is a syscall.RawConn that wraps an internal syscall.RawConn in order
 // to produce net.OpError error values.
 type rawConn struct {
-	rc     syscall.RawConn
-	local  *Addr
-	remote *Addr
+	rc            syscall.RawConn
+	local, remote *Addr
 }
 
 // Control implements the syscall.RawConn Control method.
@@ -296,8 +281,7 @@ var _ net.Addr = &Addr{}
 
 // An Addr is the address of a VM sockets endpoint.
 type Addr struct {
-	ContextID uint32
-	Port      uint32
+	ContextID, Port uint32
 }
 
 // Network returns the address's network name, "vsock".

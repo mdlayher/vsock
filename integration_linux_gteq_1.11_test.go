@@ -1,4 +1,5 @@
-//+build go1.11,linux
+//go:build go1.11 && linux
+// +build go1.11,linux
 
 package vsock_test
 

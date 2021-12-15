@@ -1,4 +1,5 @@
-//+build !linux
+//go:build !linux
+// +build !linux
 
 package vsock
 
@@ -6,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"runtime"
-	"syscall"
 	"time"
 )
 
@@ -27,17 +27,6 @@ func (*listener) Close() error                  { return errUnimplemented }
 func (*listener) SetDeadline(_ time.Time) error { return errUnimplemented }
 
 func dial(_, _ uint32) (*Conn, error) { return nil, errUnimplemented }
-
-type connFD struct{}
-
-func (*connFD) LocalAddr() net.Addr                           { return nil }
-func (*connFD) RemoteAddr() net.Addr                          { return nil }
-func (*connFD) SetDeadline(_ time.Time, _ deadlineType) error { return errUnimplemented }
-func (*connFD) Read(_ []byte) (int, error)                    { return 0, errUnimplemented }
-func (*connFD) Write(_ []byte) (int, error)                   { return 0, errUnimplemented }
-func (*connFD) Close() error                                  { return errUnimplemented }
-func (*connFD) Shutdown(_ int) error                          { return errUnimplemented }
-func (*connFD) SyscallConn() (syscall.RawConn, error)         { return nil, errUnimplemented }
 
 func contextID() (uint32, error) { return 0, errUnimplemented }
 
