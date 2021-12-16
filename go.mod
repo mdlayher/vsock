@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/google/go-cmp v0.5.6
-	github.com/mdlayher/socket v0.1.1-0.20211215205853-35cc61080ac5
-	golang.org/x/net v0.0.0-20211215060638-4ddde0e984e9
-	golang.org/x/sys v0.0.0-20211214234402-4825e8c3871d
+	github.com/mdlayher/socket v0.1.1
+	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
+	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
 )
