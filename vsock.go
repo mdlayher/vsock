@@ -15,15 +15,19 @@ import (
 
 const (
 	// Hypervisor specifies that a socket should communicate with the hypervisor
-	// process.
+	// process. Note that this is _not_ the same as a socket owned by a process
+	// running on the hypervisor. Most users should probably use Host instead.
 	Hypervisor = 0x0
 
-	// Loopback specifies that a socket should communicate with a matching
-	// socket on the same machine.
-	Loopback = 0x01
+	// Local specifies that a socket should communicate with a matching socket
+	// on the same machine. This provides an alternative to UNIX sockets or
+	// similar and may be useful in testing VM sockets applications.
+	Local = 0x1
 
 	// Host specifies that a socket should communicate with processes other than
-	// the hypervisor on the host machine.
+	// the hypervisor on the host machine. This is the correct choice to
+	// communicate with a process running on a hypervisor using a socket dialed
+	// from a guest.
 	Host = 0x2
 
 	// shutRd and shutWr are arguments for unix.Shutdown, copied here to avoid
@@ -60,29 +64,37 @@ const (
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
 // connections. The port parameter specifies the port for the Listener.
 //
-// TODO(mdlayher): document cid!
+// To allow the server to assign a port automatically, specify 0 for port. The
+// address of the server can be retrieved using the Addr method.
 //
-// To allow the server to assign a port automatically, specify 0 for port.
-// The address of the server can be retrieved using the Addr method.
+// Listen automatically infers the appropriate context ID for this machine by
+// calling ContextID and passing that value to ListenContextID. Callers with
+// advanced use cases (such as using the Local context ID) may wish to use
+// ListenContextID directly.
 //
-// When the Listener is no longer needed, Close must be called to free resources.
-func Listen(cid, port uint32) (*Listener, error) {
-	// TODO(mdlayher): resolve hypervisor versus default ambiguities before
-	// committing to this new API.
-	if cid == 0 {
-		var err error
-		cid, err = ContextID()
-		if err != nil {
-			// No addresses available.
-			return nil, opError(opListen, err, nil, nil)
-		}
+// When the Listener is no longer needed, Close must be called to free
+// resources.
+func Listen(port uint32) (*Listener, error) {
+	cid, err := ContextID()
+	if err != nil {
+		// No addresses available.
+		return nil, opError(opListen, err, nil, nil)
 	}
 
-	l, err := listen(cid, port)
+	return ListenContextID(cid, port)
+}
+
+// ListenContextID is the same as Listen, but also accepts an explicit context
+// ID parameter. This function is intended for advanced use cases and most
+// callers should use Listen instead.
+//
+// See the documentation of Listen for more details.
+func ListenContextID(contextID, port uint32) (*Listener, error) {
+	l, err := listen(contextID, port)
 	if err != nil {
 		// No remote address available.
 		return nil, opError(opListen, err, &Addr{
-			ContextID: cid,
+			ContextID: contextID,
 			Port:      port,
 		}, nil)
 	}
@@ -295,8 +307,8 @@ func (a *Addr) String() string {
 	switch a.ContextID {
 	case Hypervisor:
 		host = fmt.Sprintf("hypervisor(%d)", a.ContextID)
-	case Loopback:
-		host = fmt.Sprintf("loopback(%d)", a.ContextID)
+	case Local:
+		host = fmt.Sprintf("local(%d)", a.ContextID)
 	case Host:
 		host = fmt.Sprintf("host(%d)", a.ContextID)
 	default:

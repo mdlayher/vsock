@@ -213,10 +213,6 @@ func isBrokenPipe(err error) bool {
 	return nerr.Err == unix.EPIPE
 }
 
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
-}
-
 func TestIntegrationNettestTestConn(t *testing.T) {
 	vsutil.SkipHostIntegration(t)
 
@@ -234,7 +230,7 @@ func TestIntegrationNettestTestListener(t *testing.T) {
 	// TODO(mdlayher): stop skipping this test once that CL lands.
 
 	mos := func() (ln net.Listener, dial func(string, string) (net.Conn, error), stop func(), err error) {
-		l, err := vsock.Listen(vsock.Loopback, 0)
+		l, err := vsock.ListenContextID(vsock.Local, 0)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -280,7 +276,9 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 		panic("test took too long")
 	})
 
-	l, err := vsock.Listen(0x01, 0)
+	// Bind to Local for all integration tests to avoid the need to run a
+	// hypervisor and VM setup.
+	l, err := vsock.ListenContextID(vsock.Local, 0)
 	if err != nil {
 		vsutil.SkipDeviceError(t, err)
 
@@ -297,14 +295,14 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 
 		switch serr.Err {
 		case unix.EADDRNOTAVAIL:
-			// The kernel in use is to old to support loopback binds, so this
+			// The kernel in use is to old to support Local binds, so this
 			// test must be skipped. Print an informative message.
 			var utsname unix.Utsname
 			if err := unix.Uname(&utsname); err != nil {
 				t.Fatalf("failed to get uname: %v", err)
 			}
 
-			t.Skipf("skipping, kernel %s is too old to support AF_VSOCK loopback binds",
+			t.Skipf("skipping, kernel %s is too old to support AF_VSOCK local binds",
 				string(bytes.TrimRight(utsname.Release[:], "\x00")))
 		default:
 			t.Fatalf("unexpected vsock listener system call error: %v", err)
@@ -320,8 +318,9 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 
 func makeVSockPipe() nettest.MakePipe {
 	return makeLocalPipe(
-		func() (net.Listener, error) { return vsock.Listen(0x01, 0) },
+		func() (net.Listener, error) { return vsock.ListenContextID(vsock.Local, 0) },
 		func(addr net.Addr) (net.Conn, error) {
+			// ContextID will always be Local.
 			a := addr.(*vsock.Addr)
 			return vsock.Dial(a.ContextID, a.Port)
 		},
@@ -394,4 +393,8 @@ func makeLocalPipe(
 			return c1, c2, stop, nil
 		}
 	}
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }
