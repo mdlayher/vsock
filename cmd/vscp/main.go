@@ -14,12 +14,9 @@ import (
 	"time"
 
 	"github.com/mdlayher/vsock"
-	"github.com/mdlayher/vsock/internal/vsutil"
 )
 
-var (
-	flagVerbose = flag.Bool("v", false, "enable verbose logging to stderr")
-)
+var flagVerbose = flag.Bool("v", false, "enable verbose logging to stderr")
 
 func main() {
 	var (
@@ -96,7 +93,9 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 
 	logf("opening listener: %d", port)
 
-	l, err := vsock.Listen(port)
+	// TODO(mdlayher): support vsock.Local binds for testing.
+
+	l, err := vsock.Listen(port, nil)
 	if err != nil {
 		fatalf("failed to listen: %v", err)
 	}
@@ -106,7 +105,7 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 	log.Printf("receive: listening: %s", l.Addr())
 
 	// Accept a single connection, and receive stream from that connection.
-	c, err := vsutil.Accept(l, timeout)
+	c, err := l.Accept()
 	if err != nil {
 		fatalf("failed to accept: %v", err)
 	}
@@ -173,7 +172,7 @@ func send(target string, cid, port uint32, checksum bool) {
 	logf("dialing: %d.%d", cid, port)
 
 	// Dial a remote server and send a stream to that server.
-	c, err := vsock.Dial(cid, port)
+	c, err := vsock.Dial(cid, port, nil)
 	if err != nil {
 		fatalf("failed to dial: %v", err)
 	}
