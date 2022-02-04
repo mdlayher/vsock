@@ -56,8 +56,15 @@ const (
 	opWrite       = "write"
 )
 
+// Config contains options for a Conn or Listener.
+type Config struct {
+	// TODO(mdlayher): plumb through socket.Config.NetNS if it makes sense.
+}
+
 // Listen opens a connection-oriented net.Listener for incoming VM sockets
-// connections. The port parameter specifies the port for the Listener.
+// connections. The port parameter specifies the port for the Listener. Config
+// specifies optional configuration for the Listener. If config is nil, a
+// default configuration will be used.
 //
 // To allow the server to assign a port automatically, specify 0 for port. The
 // address of the server can be retrieved using the Addr method.
@@ -69,14 +76,14 @@ const (
 //
 // When the Listener is no longer needed, Close must be called to free
 // resources.
-func Listen(port uint32) (*Listener, error) {
+func Listen(port uint32, cfg *Config) (*Listener, error) {
 	cid, err := ContextID()
 	if err != nil {
 		// No addresses available.
 		return nil, opError(opListen, err, nil, nil)
 	}
 
-	return ListenContextID(cid, port)
+	return ListenContextID(cid, port, cfg)
 }
 
 // ListenContextID is the same as Listen, but also accepts an explicit context
@@ -84,8 +91,8 @@ func Listen(port uint32) (*Listener, error) {
 // callers should use Listen instead.
 //
 // See the documentation of Listen for more details.
-func ListenContextID(contextID, port uint32) (*Listener, error) {
-	l, err := listen(contextID, port)
+func ListenContextID(contextID, port uint32, cfg *Config) (*Listener, error) {
+	l, err := listen(contextID, port, cfg)
 	if err != nil {
 		// No remote address available.
 		return nil, opError(opListen, err, &Addr{
@@ -139,8 +146,10 @@ func (l *Listener) opError(op string, err error) error {
 	return opError(op, err, l.Addr(), nil)
 }
 
-// Dial dials a connection-oriented net.Conn to a VM sockets server.
-// The contextID and port parameters specify the address of the server.
+// Dial dials a connection-oriented net.Conn to a VM sockets listener. The
+// context ID and port parameters specify the address of the listener. Config
+// specifies optional configuration for the Conn. If config is nil, a default
+// configuration will be used.
 //
 // If dialing a connection from the hypervisor to a virtual machine, the VM's
 // context ID should be specified.
@@ -149,9 +158,10 @@ func (l *Listener) opError(op string, err error) error {
 // communicate with the hypervisor process, or Host should be used to
 // communicate with other processes on the host machine.
 //
-// When the connection is no longer needed, Close must be called to free resources.
-func Dial(contextID, port uint32) (*Conn, error) {
-	c, err := dial(contextID, port)
+// When the connection is no longer needed, Close must be called to free
+// resources.
+func Dial(contextID, port uint32, cfg *Config) (*Conn, error) {
+	c, err := dial(contextID, port, cfg)
 	if err != nil {
 		// No local address, but we have a remote address we can return.
 		return nil, opError(opDial, err, nil, &Addr{

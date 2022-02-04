@@ -96,7 +96,9 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 
 	logf("opening listener: %d", port)
 
-	l, err := vsock.Listen(port)
+	// TODO(mdlayher): support vsock.Local binds for testing.
+
+	l, err := vsock.Listen(port, nil)
 	if err != nil {
 		fatalf("failed to listen: %v", err)
 	}
@@ -173,7 +175,7 @@ func send(target string, cid, port uint32, checksum bool) {
 	logf("dialing: %d.%d", cid, port)
 
 	// Dial a remote server and send a stream to that server.
-	c, err := vsock.Dial(cid, port)
+	c, err := vsock.Dial(cid, port, nil)
 	if err != nil {
 		fatalf("failed to dial: %v", err)
 	}

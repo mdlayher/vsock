@@ -47,8 +47,10 @@ func (l *listener) Accept() (net.Conn, error) {
 }
 
 // listen is the entry point for Listen on Linux.
-func listen(cid, port uint32) (*Listener, error) {
-	// TODO(mdlayher): pass in cfg.
+func listen(cid, port uint32, _ *Config) (*Listener, error) {
+	// TODO(mdlayher): Config default nil check and initialize. Pass options to
+	// socket.Config where necessary.
+
 	c, err := socket.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0, "vsock", nil)
 	if err != nil {
 		return nil, err

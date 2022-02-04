@@ -9,8 +9,10 @@ import (
 )
 
 // dial is the entry point for Dial on Linux.
-func dial(cid, port uint32) (*Conn, error) {
-	// TODO(mdlayher): pass cfg.
+func dial(cid, port uint32, _ *Config) (*Conn, error) {
+	// TODO(mdlayher): Config default nil check and initialize. Pass options to
+	// socket.Config where necessary.
+
 	c, err := socket.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0, "vsock", nil)
 	if err != nil {
 		return nil, err

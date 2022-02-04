@@ -230,7 +230,7 @@ func TestIntegrationNettestTestListener(t *testing.T) {
 	// TODO(mdlayher): stop skipping this test once that CL lands.
 
 	mos := func() (ln net.Listener, dial func(string, string) (net.Conn, error), stop func(), err error) {
-		l, err := vsock.ListenContextID(vsock.Local, 0)
+		l, err := vsock.ListenContextID(vsock.Local, 0, nil)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -258,7 +258,7 @@ func TestIntegrationNettestTestListener(t *testing.T) {
 				return nil, err
 			}
 
-			return vsock.Dial(uint32(cid), uint32(port))
+			return vsock.Dial(uint32(cid), uint32(port), nil)
 		}
 
 		return l, dial, stop, nil
@@ -278,7 +278,7 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 
 	// Bind to Local for all integration tests to avoid the need to run a
 	// hypervisor and VM setup.
-	l, err := vsock.ListenContextID(vsock.Local, 0)
+	l, err := vsock.ListenContextID(vsock.Local, 0, nil)
 	if err != nil {
 		vsutil.SkipDeviceError(t, err)
 
@@ -318,11 +318,11 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 
 func makeVSockPipe() nettest.MakePipe {
 	return makeLocalPipe(
-		func() (net.Listener, error) { return vsock.ListenContextID(vsock.Local, 0) },
+		func() (net.Listener, error) { return vsock.ListenContextID(vsock.Local, 0, nil) },
 		func(addr net.Addr) (net.Conn, error) {
 			// ContextID will always be Local.
 			a := addr.(*vsock.Addr)
-			return vsock.Dial(a.ContextID, a.Port)
+			return vsock.Dial(a.ContextID, a.Port, nil)
 		},
 	)
 }
