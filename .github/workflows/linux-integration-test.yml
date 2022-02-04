@@ -1,0 +1,36 @@
+name: Linux Integration Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        go-version: [1.12, 1.17]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Load the vhost_vsock kernel module
+      run: sudo modprobe vhost_vsock
+
+    - name: Change the permissions of /dev/vsock for integration tests
+      run: sudo chmod 666 /dev/vsock
+
+    - name: Run integration tests
+      run: go test -v -race -run TestIntegration ./...
+
