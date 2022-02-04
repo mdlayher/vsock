@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/mdlayher/vsock"
-	"github.com/mdlayher/vsock/internal/vsutil"
 )
 
 var (
@@ -108,7 +107,7 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 	log.Printf("receive: listening: %s", l.Addr())
 
 	// Accept a single connection, and receive stream from that connection.
-	c, err := vsutil.Accept(l, timeout)
+	c, err := l.Accept()
 	if err != nil {
 		fatalf("failed to accept: %v", err)
 	}
