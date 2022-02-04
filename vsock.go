@@ -266,6 +266,10 @@ func (c *Conn) opError(op string, err error) error {
 	return opError(op, err, c.local, c.remote)
 }
 
+// TODO(mdlayher): see if we can port smarter net.OpError with local/remote
+// address error logic into socket.Conn's SyscallConn type to avoid the need for
+// this wrapper.
+
 var _ syscall.RawConn = &rawConn{}
 
 // A rawConn is a syscall.RawConn that wraps an internal syscall.RawConn in order
