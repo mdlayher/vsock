@@ -30,11 +30,6 @@ const (
 	// from a guest.
 	Host = 0x2
 
-	// shutRd and shutWr are arguments for unix.Shutdown, copied here to avoid
-	// importing x/sys/unix in cross-platform code.
-	shutRd = 0 // unix.SHUT_RD
-	shutWr = 1 // unix.SHUT_WR
-
 	// Error numbers we recognize, copied here to avoid importing x/sys/unix in
 	// cross-platform code.
 	ebadf    = 9
@@ -186,13 +181,13 @@ func (c *Conn) Close() error {
 // CloseRead shuts down the reading side of the VM sockets connection. Most
 // callers should just use Close.
 func (c *Conn) CloseRead() error {
-	return c.opError(opClose, c.c.Shutdown(shutRd))
+	return c.opError(opClose, c.c.CloseRead())
 }
 
 // CloseWrite shuts down the writing side of the VM sockets connection. Most
 // callers should just use Close.
 func (c *Conn) CloseWrite() error {
-	return c.opError(opClose, c.c.Shutdown(shutWr))
+	return c.opError(opClose, c.c.CloseWrite())
 }
 
 // LocalAddr returns the local network address. The Addr returned is shared by
