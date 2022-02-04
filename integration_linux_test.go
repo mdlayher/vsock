@@ -4,6 +4,7 @@
 package vsock_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -283,7 +284,31 @@ func newListener(t *testing.T) (*vsock.Listener, func()) {
 	if err != nil {
 		vsutil.SkipDeviceError(t, err)
 
-		t.Fatalf("failed to create vsock listener: %v", err)
+		// Unwrap net.OpError + os.SyscallError if needed.
+		// TODO(mdlayher): errors.Unwrap in Go 1.13.
+		nerr, ok := err.(*net.OpError)
+		if !ok {
+			t.Fatalf("failed to create vsock listener: %v", err)
+		}
+		serr, ok := nerr.Err.(*os.SyscallError)
+		if !ok {
+			t.Fatalf("unexpected inner error for *net.OpError: %#v", nerr.Err)
+		}
+
+		switch serr.Err {
+		case unix.EADDRNOTAVAIL:
+			// The kernel in use is to old to support loopback binds, so this
+			// test must be skipped. Print an informative message.
+			var utsname unix.Utsname
+			if err := unix.Uname(&utsname); err != nil {
+				t.Fatalf("failed to get uname: %v", err)
+			}
+
+			t.Skipf("skipping, kernel %s is too old to support AF_VSOCK loopback binds",
+				string(bytes.TrimRight(utsname.Release[:], "\x00")))
+		default:
+			t.Fatalf("unexpected vsock listener system call error: %v", err)
+		}
 	}
 
 	return l, func() {
