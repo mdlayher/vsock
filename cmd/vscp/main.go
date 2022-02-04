@@ -16,9 +16,7 @@ import (
 	"github.com/mdlayher/vsock"
 )
 
-var (
-	flagVerbose = flag.Bool("v", false, "enable verbose logging to stderr")
-)
+var flagVerbose = flag.Bool("v", false, "enable verbose logging to stderr")
 
 func main() {
 	var (

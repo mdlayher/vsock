@@ -173,8 +173,10 @@ func Dial(contextID, port uint32, cfg *Config) (*Conn, error) {
 	return c, nil
 }
 
-var _ net.Conn = &Conn{}
-var _ syscall.Conn = &Conn{}
+var (
+	_ net.Conn     = &Conn{}
+	_ syscall.Conn = &Conn{}
+)
 
 // A Conn is a VM sockets implementation of a net.Conn.
 type Conn struct {
