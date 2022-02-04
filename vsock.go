@@ -329,6 +329,13 @@ func opError(op string, err error, local, remote net.Addr) error {
 		return nil
 	}
 
+	// TODO(mdlayher): this entire function is suspect and should probably be
+	// looked at carefully, especially with Go 1.13+ error wrapping.
+	//
+	// Eventually this *net.OpError logic should probably be ported into
+	// mdlayher/socket because similar checks are necessary to comply with
+	// nettest.TestConn.
+
 	// Unwrap inner errors from error types.
 	//
 	// TODO(mdlayher): errors.Cause or similar in Go 1.13.
