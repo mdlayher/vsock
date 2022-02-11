@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"regexp"
@@ -197,6 +198,29 @@ func TestIntegrationConnSyscallConn(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("failed to control: %v", err)
+	}
+}
+
+func TestIntegrationConnDialNoListener(t *testing.T) {
+	// Dial out to vsock listeners which do not exist, and expect an immediate
+	// error rather than hanging. This mostly relies on changes to the
+	// underlying socket library, but we test it anyway to lock things in.
+	//
+	// See: https://github.com/mdlayher/vsock/issues/47.
+	const max = math.MaxUint32
+	for _, port := range []uint32{max - 2, max - 1, max} {
+		_, got := vsock.Dial(vsock.Local, port, nil)
+
+		want := &net.OpError{
+			Op:   "dial",
+			Net:  "vsock",
+			Addr: &vsock.Addr{ContextID: vsock.Local, Port: port},
+			Err:  os.NewSyscallError("connect", unix.ECONNRESET),
+		}
+
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("unexpected error (-want +got):\n%s", diff)
+		}
 	}
 }
 
