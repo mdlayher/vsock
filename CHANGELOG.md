@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v1.1.0
+
+- [New API] [commit](https://github.com/mdlayher/vsock/commit/44cd82dc5f7de644436f22236b111ab97fa9a14f):
+  `vsock.FileListener` can be used to create a `vsock.Listener` from an existing
+  `os.File`, which may be provided by systemd socket activation or another
+  external mechanism.
+
 ## v1.0.1
 
 - [Bug Fix] [commit](https://github.com/mdlayher/vsock/commit/99a6dccdebad21d1fa5f757d228d677ccb1412dc):
