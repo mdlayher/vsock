@@ -18,7 +18,8 @@ func dial(cid, port uint32, _ *Config) (*Conn, error) {
 		return nil, err
 	}
 
-	if err := c.Connect(&unix.SockaddrVM{CID: cid, Port: port}); err != nil {
+	rsa, err := c.Connect(&unix.SockaddrVM{CID: cid, Port: port})
+	if err != nil {
 		_ = c.Close()
 		return nil, err
 	}
@@ -30,6 +31,8 @@ func dial(cid, port uint32, _ *Config) (*Conn, error) {
 	}
 
 	lsavm := lsa.(*unix.SockaddrVM)
+	rsavm := rsa.(*unix.SockaddrVM)
+
 	return &Conn{
 		c: c,
 		local: &Addr{
@@ -37,8 +40,8 @@ func dial(cid, port uint32, _ *Config) (*Conn, error) {
 			Port:      lsavm.Port,
 		},
 		remote: &Addr{
-			ContextID: cid,
-			Port:      port,
+			ContextID: rsavm.CID,
+			Port:      rsavm.Port,
 		},
 	}, nil
 }

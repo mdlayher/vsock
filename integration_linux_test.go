@@ -20,6 +20,7 @@ import (
 	"github.com/mdlayher/vsock"
 	"github.com/mdlayher/vsock/internal/vsutil"
 	"golang.org/x/net/nettest"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 )
 
@@ -226,6 +227,105 @@ func TestIntegrationConnDialNoListener(t *testing.T) {
 		if diff := cmp.Diff(want, err); diff != "" {
 			t.Errorf("unexpected error (-want +got):\n%s", diff)
 		}
+	}
+}
+
+func TestIntegrationFileListenerOK(t *testing.T) {
+	// Use raw system calls to set up the socket for FileListener. Although the
+	// socket library does the heavy lifting, we want to verify that this also
+	// works specifically for AF_VSOCK.
+	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	if err != nil {
+		t.Fatalf("failed to open socket: %v", err)
+	}
+
+	// Bind to local, any available port.
+	err = unix.Bind(fd, &unix.SockaddrVM{
+		CID:  unix.VMADDR_CID_LOCAL,
+		Port: unix.VMADDR_PORT_ANY,
+	})
+	if err != nil {
+		// Same problem with GitHub actions kernel, investigate.
+		switch err {
+		case unix.EADDRNOTAVAIL:
+			skipOldKernel(t)
+		default:
+			t.Fatalf("failed to bind: %v", err)
+		}
+	}
+
+	if err := unix.Listen(fd, unix.SOMAXCONN); err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	// The socket should be ready, create a blocking file which is ready to be
+	// passed into FileListener.
+	f := os.NewFile(uintptr(fd), "vsock-listener")
+	defer f.Close()
+
+	l, err := vsock.FileListener(f)
+	if err != nil {
+		t.Fatalf("failed to open file listener: %v", err)
+	}
+	defer l.Close()
+
+	// To exercise the listener, attempt to accept and then immediately close a
+	// single vsock connection. Dial to the listener from the main goroutine and
+	// wait for everything to finish.
+	var eg errgroup.Group
+	eg.Go(func() error {
+		c, err := l.Accept()
+		if err != nil {
+			return fmt.Errorf("failed to accept: %v", err)
+		}
+
+		_ = c.Close()
+		return nil
+	})
+
+	addr := l.Addr().(*vsock.Addr)
+	c, err := vsock.Dial(addr.ContextID, addr.Port, nil)
+	if err != nil {
+		t.Fatalf("failed to dial listener: %v", err)
+	}
+	_ = c.Close()
+
+	if err := eg.Wait(); err != nil {
+		t.Fatalf("failed to wait for listener goroutine: %v", err)
+	}
+}
+
+func TestIntegrationFileListenerInvalid(t *testing.T) {
+	// Same idea as the previous test, but intentionally create a TCP socket
+	// instead of a vsock so we can verify the library rejects the socket.
+	fd, err := unix.Socket(unix.AF_INET6, unix.SOCK_STREAM, 0)
+	if err != nil {
+		t.Fatalf("failed to open socket: %v", err)
+	}
+
+	// Bind to any address.
+	if err := unix.Bind(fd, &unix.SockaddrInet6{}); err != nil {
+		t.Fatalf("failed to bind: %v", err)
+	}
+
+	if err := unix.Listen(fd, unix.SOMAXCONN); err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	// The library should reject this file for having the wrong address family.
+	f := os.NewFile(uintptr(fd), "tcpv6-listener")
+	defer f.Close()
+
+	_, got := vsock.FileListener(f)
+
+	want := &net.OpError{
+		Op:  "listen",
+		Net: "vsock",
+		Err: os.NewSyscallError("listen", unix.EINVAL),
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("unexpected error (-want +got):\n%s", diff)
 	}
 }
 
