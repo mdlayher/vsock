@@ -18,10 +18,18 @@ func dial(cid, port uint32, _ *Config) (*Conn, error) {
 		return nil, err
 	}
 
-	rsa, err := c.Connect(&unix.SockaddrVM{CID: cid, Port: port})
+	sa := &unix.SockaddrVM{CID: cid, Port: port}
+	rsa, err := c.Connect(sa)
 	if err != nil {
 		_ = c.Close()
 		return nil, err
+	}
+
+	// TODO(mdlayher): getpeername(2) appears to return nil in the GitHub CI
+	// environment, so in the event of a nil sockaddr, fall back to the previous
+	// method of synthesizing the remote address.
+	if rsa == nil {
+		rsa = sa
 	}
 
 	lsa, err := c.Getsockname()
