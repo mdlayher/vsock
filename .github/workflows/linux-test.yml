@@ -27,3 +27,10 @@ jobs:
 
     - name: Run tests
       run: go test -v -race ./...
+
+    # Although this package doesn't support Windows, we want to verify that
+    # everything builds properly.
+    - name: Verify build for non-UNIX platforms
+      run: go build
+      env:
+        GOOS: windows
