@@ -19,8 +19,3 @@ occur in the v1.x.x series.
 This package only supports the two most recent major versions of Go, mirroring
 Go's own release policy. Older versions of Go may lack critical features and bug
 fixes which are necessary for this package to function correctly.
-
-Check out the
-
-for more details.  More detail on setting up this environment will be provided
-in the future.
