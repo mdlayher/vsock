@@ -74,8 +74,8 @@ func TestIntegrationListenerUnblockAcceptTimeout(t *testing.T) {
 		t.Fatal("expected an error, but none occurred")
 	}
 
-	if nerr, ok := err.(net.Error); !ok || (ok && !nerr.Temporary()) {
-		t.Errorf("expected temporary network error, but got: %#v", err)
+	if nerr, ok := err.(net.Error); !ok || (ok && !nerr.Timeout()) {
+		t.Errorf("expected timeout network error, but got: %#v", err)
 	}
 }
 
