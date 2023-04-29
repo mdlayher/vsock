@@ -5,6 +5,7 @@ package vsock_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -212,16 +213,29 @@ func TestIntegrationConnDialNoListener(t *testing.T) {
 	for _, port := range []uint32{max - 2, max - 1, max} {
 		_, err := vsock.Dial(vsock.Local, port, nil)
 		if err == nil {
-			// It seems local binds don't work in GitHub actions right now.
-			// Skip for now.
-			skipOldKernel(t)
+			t.Fatal("dial succeeded, but should not have")
 		}
+
+		got, ok := err.(*net.OpError)
+		if !ok {
+			t.Fatalf("expected *net.OpError, but got %T", err)
+		}
+
+		// Expect one of ECONNRESET or ENODEV depending on the kernel.
+		switch {
+		case errors.Is(got.Err, unix.ECONNRESET), errors.Is(got.Err, unix.ENODEV):
+			// OK.
+		default:
+			t.Fatalf("unexpected syscall error: %v", got.Err)
+		}
+
+		// Zero out the error comparison.
+		got.Err = nil
 
 		want := &net.OpError{
 			Op:   "dial",
 			Net:  "vsock",
 			Addr: &vsock.Addr{ContextID: vsock.Local, Port: port},
-			Err:  os.NewSyscallError("connect", unix.ECONNRESET),
 		}
 
 		if diff := cmp.Diff(want, err); diff != "" {
