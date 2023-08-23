@@ -221,9 +221,10 @@ func TestIntegrationConnDialNoListener(t *testing.T) {
 			t.Fatalf("expected *net.OpError, but got %T", err)
 		}
 
-		// Expect one of ECONNRESET or ENODEV depending on the kernel.
+		// Expect one of ECONNRESET, ENODEV, ENETUNREACH, ETIMEDOUT depending on the kernel.
 		switch {
-		case errors.Is(got.Err, unix.ECONNRESET), errors.Is(got.Err, unix.ENODEV):
+		case errors.Is(got.Err, unix.ECONNRESET), errors.Is(got.Err, unix.ENODEV),
+			errors.Is(got.Err, unix.ENETUNREACH), errors.Is(got.Err, unix.ETIMEDOUT):
 			// OK.
 		default:
 			t.Fatalf("unexpected syscall error: %v", got.Err)
