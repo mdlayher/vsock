@@ -87,21 +87,6 @@ func Test_opError(t *testing.T) {
 			},
 		},
 		{
-			name: "special PathError /dev/vsock",
-			err: &os.PathError{
-				Op:   "open",
-				Path: devVsock,
-				Err:  unix.ENOENT,
-			},
-			want: &net.OpError{
-				Err: &os.PathError{
-					Op:   "open",
-					Path: devVsock,
-					Err:  unix.ENOENT,
-				},
-			},
-		},
-		{
 			name:   "op close",
 			op:     opClose,
 			err:    errClosed,

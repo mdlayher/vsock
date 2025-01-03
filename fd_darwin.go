@@ -2,22 +2,21 @@ package vsock
 
 import (
 	"fmt"
-	"os"
 
 	"golang.org/x/sys/unix"
 )
 
 // contextID retrieves the local context ID for this system.
 func contextID() (uint32, error) {
-	f, err := os.Open(devVsock)
-	if err != nil {
-		return 0, err
+	if fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0); err != nil {
+		return 2, nil
+	} else {
+		defer unix.Close(fd)
+
+		cid, err := unix.IoctlGetInt(fd, unix.IOCTL_VM_SOCKETS_GET_LOCAL_CID)
+
+		return uint32(cid), err
 	}
-	defer f.Close()
-
-	cid, err := unix.IoctlGetInt(int(f.Fd()), unix.IOCTL_VM_SOCKETS_GET_LOCAL_CID)
-
-	return uint32(cid), err
 }
 
 // isErrno determines if an error a matches UNIX error number.
