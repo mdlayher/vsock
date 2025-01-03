@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -53,6 +54,10 @@ const (
 	opSyscallConn = "syscall-conn"
 	opWrite       = "write"
 )
+
+// errUnimplemented is returned by all functions on platforms that
+// cannot make use of VM sockets.
+var errUnimplemented = fmt.Errorf("vsock: not implemented on %s", runtime.GOOS)
 
 // TODO(mdlayher): plumb through socket.Config.NetNS if it makes sense.
 
