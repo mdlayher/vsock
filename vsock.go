@@ -1,11 +1,12 @@
 package vsock
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -53,6 +54,10 @@ const (
 	opSyscallConn = "syscall-conn"
 	opWrite       = "write"
 )
+
+// errUnimplemented is returned by all functions on platforms that
+// cannot make use of VM sockets.
+var errUnimplemented = fmt.Errorf("vsock: not implemented on %s", runtime.GOOS)
 
 // TODO(mdlayher): plumb through socket.Config.NetNS if it makes sense.
 
@@ -176,7 +181,21 @@ func (l *Listener) opError(op string, err error) error {
 // When the connection is no longer needed, Close must be called to free
 // resources.
 func Dial(contextID, port uint32, cfg *Config) (*Conn, error) {
-	c, err := dial(contextID, port, cfg)
+	return dial(context.Background(), contextID, port, cfg)
+}
+
+// DialWithContext connects to the address on the named network using
+// the provided context.
+//
+// The provided Context must be non-nil. If the context expires before
+// the connection is complete, an error is returned. Once successfully
+// connected, any expiration of the context will not affect the
+// connection.
+//
+// See func Dial for a description of the contextID and port
+// parameters.
+func DialWithContext(ctx context.Context, contextID, port uint32, cfg *Config) (*Conn, error) {
+	c, err := dial(ctx, contextID, port, cfg)
 	if err != nil {
 		// No local address, but we have a remote address we can return.
 		return nil, opError(opDial, err, nil, &Addr{
@@ -403,7 +422,7 @@ func opError(op string, err error, local, remote net.Addr) error {
 		//
 		// To rectify the differences, net.TCPConn uses an error with this text
 		// from internal/poll for the backing file already being closed.
-		err = errors.New("use of closed network connection")
+		err = net.ErrClosed
 	default:
 		// Nothing to do, return this directly.
 	}
