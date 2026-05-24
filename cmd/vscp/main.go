@@ -60,11 +60,11 @@ func main() {
 // or stdout, if no file is specified.
 func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 	// Log helper functions.
-	logf := func(format string, a ...interface{}) {
+	logf := func(format string, a ...any) {
 		logf("receive: "+format, a...)
 	}
 
-	fatalf := func(format string, a ...interface{}) {
+	fatalf := func(format string, a ...any) {
 		log.Fatalf("vscp: receive: "+format, a...)
 	}
 
@@ -138,11 +138,11 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 // is specified.
 func send(target string, cid, port uint32, checksum bool) {
 	// Log helper functions.
-	logf := func(format string, a ...interface{}) {
+	logf := func(format string, a ...any) {
 		logf("send: "+format, a...)
 	}
 
-	fatalf := func(format string, a ...interface{}) {
+	fatalf := func(format string, a ...any) {
 		log.Fatalf("vscp: send: "+format, a...)
 	}
 
@@ -195,7 +195,7 @@ func send(target string, cid, port uint32, checksum bool) {
 
 // logf shows verbose logging if -v is specified, or does nothing
 // if it is not.
-func logf(format string, a ...interface{}) {
+func logf(format string, a ...any) {
 	if !*flagVerbose {
 		return
 	}
