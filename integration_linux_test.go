@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 package vsock_test
 
@@ -209,8 +208,8 @@ func TestIntegrationConnDialNoListener(t *testing.T) {
 	// underlying socket library, but we test it anyway to lock things in.
 	//
 	// See: https://github.com/mdlayher/vsock/issues/47.
-	const max = math.MaxUint32
-	for _, port := range []uint32{max - 2, max - 1, max} {
+	const maxUint32 = math.MaxUint32
+	for _, port := range []uint32{maxUint32 - 2, maxUint32 - 1, maxUint32} {
 		_, err := vsock.Dial(vsock.Local, port, nil)
 		if err == nil {
 			t.Fatal("dial succeeded, but should not have")
@@ -545,6 +544,6 @@ func makeLocalPipe(
 	}
 }
 
-func panicf(format string, a ...interface{}) {
+func panicf(format string, a ...any) {
 	panic(fmt.Sprintf(format, a...))
 }
