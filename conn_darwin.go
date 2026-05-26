@@ -1,4 +1,5 @@
-//go:build linux
+//go:build darwin
+// +build darwin
 
 package vsock
 
