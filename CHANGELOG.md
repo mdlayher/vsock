@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.3.0
+
+- [Improvement]: Updated dependencies and now requires Go 1.25. (#63)
+- [Improvement]: Update to use net.ErrClosed error (#57)
+- [Tests]: Check for ENETUNREACH and ETIMEDOUT in tests (#54)
+
 ## v1.2.1
 
 - [Improvement]: updated dependencies, test with Go 1.20.
