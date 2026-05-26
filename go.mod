@@ -7,5 +7,5 @@ require (
 	github.com/mdlayher/socket v0.5.1
 	golang.org/x/net v0.42.0
 	golang.org/x/sync v0.16.0
-	golang.org/x/sys v0.34.0
+	golang.org/x/sys v0.45.0
 )
