@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - "1.26"
+          - "1.27"
     runs-on: ubuntu-latest
 
     steps:
@@ -31,4 +31,4 @@ jobs:
         uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
         with:
           args: --verbose
-          version: v2.11.4
+          version: v2.14.0
