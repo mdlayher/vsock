@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"flag"
 	"hash"
@@ -28,6 +29,8 @@ func main() {
 
 		flagHash    = flag.Bool("h", false, "display a checksum hash of the input or output data after transfer completes")
 		flagTimeout = flag.Duration("t", 0, "receive only: timeout for read operations (default: no timeout)")
+
+		flagDialTimeout = flag.Duration("d", 0, "send only: timeout for Dial (default: no timeout)")
 	)
 
 	flag.Parse()
@@ -49,7 +52,7 @@ func main() {
 
 		receive(target, uint32(*flagPort), *flagTimeout, *flagHash)
 	case *flagSend:
-		send(target, uint32(*flagContextID), uint32(*flagPort), *flagHash)
+		send(target, uint32(*flagContextID), uint32(*flagPort), *flagDialTimeout, *flagHash)
 	default:
 		flag.PrintDefaults()
 	}
@@ -133,10 +136,21 @@ func receive(target string, port uint32, timeout time.Duration, checksum bool) {
 	}
 }
 
+func dialWithTimeout(cid, port uint32, dialTimeout time.Duration) (*vsock.Conn, error) {
+	if dialTimeout == 0 {
+		return vsock.Dial(cid, port, nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
+	defer cancel()
+
+	return vsock.DialContext(ctx, cid, port, nil)
+}
+
 // send dials a server and sends data to it using VM sockets.  The data
 // is read from target, which may be a file, or stdin if no file or "-"
 // is specified.
-func send(target string, cid, port uint32, checksum bool) {
+func send(target string, cid, port uint32, dialTimeout time.Duration, checksum bool) {
 	// Log helper functions.
 	logf := func(format string, a ...any) {
 		logf("send: "+format, a...)
@@ -172,7 +186,7 @@ func send(target string, cid, port uint32, checksum bool) {
 	logf("dialing: %d.%d", cid, port)
 
 	// Dial a remote server and send a stream to that server.
-	c, err := vsock.Dial(cid, port, nil)
+	c, err := dialWithTimeout(cid, port, dialTimeout)
 	if err != nil {
 		fatalf("failed to dial: %v", err)
 	}

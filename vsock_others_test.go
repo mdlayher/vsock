@@ -3,7 +3,10 @@
 
 package vsock
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestUnimplemented(t *testing.T) {
 	want := errUnimplemented
@@ -18,7 +21,7 @@ func TestUnimplemented(t *testing.T) {
 			want, got)
 	}
 
-	if _, got := dial(0, 0, nil); want != got {
+	if _, got := dial(context.Background(), 0, 0, nil); want != got {
 		t.Fatalf("unexpected error from dial:\n- want: %v\n-  got: %v",
 			want, got)
 	}
