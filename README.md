@@ -3,6 +3,9 @@
 Package `vsock` provides access to Linux VM sockets (`AF_VSOCK`) for
 communication between a hypervisor and its virtual machines.  MIT Licensed.
 
+Windows guests are also supported through the `viosock` driver from
+[virtio-win](https://github.com/virtio-win/kvm-guest-drivers-windows).
+
 For more information about VM sockets, see my blog about
 [Linux VM sockets in Go](https://mdlayher.com/blog/linux-vm-sockets-in-go/) or
 the [QEMU wiki page on virtio-vsock](http://wiki.qemu-project.org/Features/VirtioVsock).
