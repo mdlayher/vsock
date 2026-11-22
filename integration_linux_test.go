@@ -81,6 +81,7 @@ func TestIntegrationListenerUnblockAcceptTimeout(t *testing.T) {
 
 func TestIntegrationConnShutdown(t *testing.T) {
 	vsutil.SkipHostIntegration(t)
+	skipNoLocal(t)
 
 	// This functionality is proposed for inclusion in x/net/nettest, and should
 	// be removed from here if the proposal is accepted. See:
@@ -162,6 +163,7 @@ func TestIntegrationConnShutdown(t *testing.T) {
 
 func TestIntegrationConnSyscallConn(t *testing.T) {
 	vsutil.SkipHostIntegration(t)
+	skipNoLocal(t)
 
 	mp := makeVSockPipe()
 
@@ -358,6 +360,7 @@ func isBrokenPipe(err error) bool {
 
 func TestIntegrationNettestTestConn(t *testing.T) {
 	vsutil.SkipHostIntegration(t)
+	skipNoLocal(t)
 
 	nettest.TestConn(t, makeVSockPipe())
 }
@@ -463,6 +466,20 @@ func skipOldKernel(t *testing.T) {
 
 	t.Skipf("skipping, kernel %s is too old to support AF_VSOCK local binds",
 		string(bytes.TrimRight(utsname.Release[:], "\x00")))
+}
+
+// skipNoLocal skips the test if binding to Local isn't supported.
+func skipNoLocal(t *testing.T) {
+	t.Helper()
+
+	l, err := vsock.ListenContextID(vsock.Local, 0, nil)
+	if errors.Is(err, unix.EADDRNOTAVAIL) {
+		skipOldKernel(t)
+	}
+
+	if err == nil {
+		_ = l.Close()
+	}
 }
 
 func makeVSockPipe() nettest.MakePipe {
